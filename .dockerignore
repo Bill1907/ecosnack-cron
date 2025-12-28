@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+
+# Test files
+tests/
+*.test.ts
+
+# Environment files (Render에서 환경변수로 설정)
+.env
+.env.*
+!.env.example
+
+# Documentation
+README.md
+CLAUDE.md
+
+# Build artifacts
+dist/
+*.log
+
