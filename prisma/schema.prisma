@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Article {
+  id              Int       @id @default(autoincrement())
+
+  // 기본 정보
+  title           String    @db.Text
+  link            String    @unique @db.Text
+  description     String?   @db.Text
+  pubDate         DateTime? @map("pub_date") @db.Timestamptz
+  source          String?   @db.VarChar(100)
+  region          String?   @db.VarChar(10)
+  imageUrl        String?   @map("image_url") @db.Text
+
+  // AI 분석 결과
+  headlineSummary String?   @map("headline_summary") @db.Text
+  soWhat          Json?     @map("so_what") @db.JsonB
+  impactAnalysis  Json?     @map("impact_analysis") @db.JsonB
+  relatedContext  Json?     @map("related_context") @db.JsonB
+
+  // 메타데이터
+  keywords        String[]  @default([])
+  category        String?   @db.VarChar(50)
+  sentiment       Json?     @db.JsonB
+  importanceScore Int?      @map("importance_score")
+
+  // 시스템
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("articles")
+}
