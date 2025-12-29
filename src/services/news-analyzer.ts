@@ -16,6 +16,7 @@ import type {
   QualityFilterResponse,
 } from "@/types/index.ts";
 import { log, getErrorMessage } from "@/utils/index.ts";
+import { buildAnalysisPrompt } from "@/services/prompt-builder.ts";
 
 // ============================================
 // OpenAI 클라이언트 (싱글톤)
@@ -400,30 +401,19 @@ async function analyzeArticleWithAI(
 ): Promise<NewsAnalysisResult | null> {
   const client = getOpenAIClient();
 
-  const userPrompt = `뉴스 제목: ${article.title}
-링크: ${article.link}
-날짜: ${article.pubDate?.toISOString() ?? "Unknown"}
-내용: ${article.description ?? "(내용 없음)"}
-
-## Article
-- Title: ${article.title}
-- Description: ${article.description ?? "(No description)"}
-- Source: ${article.source ?? "Unknown"}
-- Published: ${article.pubDate?.toISOString() ?? "Unknown"}
-- Link: ${article.link}
-
-위 뉴스 기사를 분석해주세요.`;
+  // 동적 프롬프트 생성 (Few-shot, Rubric, CoT 포함)
+  const { system, user } = buildAnalysisPrompt(article);
 
   try {
     const response = await client.chat.completions.create({
       model: config.openai.model,
       messages: [
-        { role: "system", content: DETAILED_ANALYSIS_SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
+        { role: "system", content: system },
+        { role: "user", content: user },
       ],
       response_format: zodResponseFormat(NewsAnalysisResultSchema, "news_analysis"),
       temperature: 0.4,
-      max_tokens: 2000,
+      max_tokens: 3000, // 프롬프트가 길어졌으므로 증가
     });
 
     const content = response.choices[0]?.message?.content;

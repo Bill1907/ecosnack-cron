@@ -30,8 +30,17 @@ model Article {
   sentiment       Json?     @db.JsonB
   importanceScore Int?      @map("importance_score")
 
+  // 피드백 시스템 (Few-shot 학습용)
+  qualityRating   Int?      @map("quality_rating")  // 1-5 품질 평가
+  isExemplar      Boolean   @default(false) @map("is_exemplar")  // 좋은 예시로 마킹
+  feedbackNotes   String?   @map("feedback_notes") @db.Text
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz
+
   // 시스템
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
+  @@index([isExemplar])
+  @@index([category])
+  @@index([qualityRating])
   @@map("articles")
 }
