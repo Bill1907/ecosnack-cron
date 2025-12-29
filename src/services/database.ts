@@ -42,15 +42,50 @@ export function getPrisma(): PrismaClient {
   return prisma;
 }
 
+// JSON 필드를 Prisma에 맞게 변환 (undefined → DbNull, 값이 있으면 그대로)
+function toJsonValue(
+  value: unknown
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  if (value === undefined || value === null) {
+    return Prisma.DbNull; // SQL NULL 저장 (JsonNull은 JSON의 null 값)
+  }
+  return value as Prisma.InputJsonValue;
+}
+
+// importanceScore를 1-10 범위로 정규화
+function normalizeImportanceScore(score: number | undefined): number | null {
+  if (score === undefined || score === null) {
+    return null;
+  }
+  // 이미 1-10 범위면 그대로, 아니면 100점 만점을 10점 만점으로 변환
+  if (score >= 1 && score <= 10) {
+    return Math.round(score);
+  }
+  // 0-100 범위를 1-10으로 변환
+  return Math.max(1, Math.min(10, Math.round(score / 10)));
+}
+
 // 뉴스 기사 저장
-export async function saveNewsArticle(article: AnalyzedNewsArticle): Promise<NewsRecord | null> {
+export async function saveNewsArticle(
+  article: AnalyzedNewsArticle
+): Promise<NewsRecord | null> {
   const db = getPrisma();
 
   try {
-    const result = await db.article.upsert({
+    // 1. 기존 기사 존재 여부 확인
+    const existing = await db.article.findUnique({
       where: { link: article.link },
-      update: {}, // 중복 시 업데이트 안 함
-      create: {
+    });
+
+    // 2. 중복이면 null 반환 (카운트 미포함)
+    if (existing) {
+      log(`뉴스 중복 건너뜀: ${article.title}`, "warn");
+      return null;
+    }
+
+    // 3. 신규 기사만 저장
+    const result = await db.article.create({
+      data: {
         title: article.title,
         link: article.link,
         description: article.description ?? null,
@@ -59,13 +94,13 @@ export async function saveNewsArticle(article: AnalyzedNewsArticle): Promise<New
         region: article.region ?? null,
         imageUrl: article.imageUrl ?? null,
         headlineSummary: article.headlineSummary ?? null,
-        soWhat: (article.soWhat as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        impactAnalysis: (article.impactAnalysis as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        relatedContext: (article.relatedContext as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+        soWhat: toJsonValue(article.soWhat),
+        impactAnalysis: toJsonValue(article.impactAnalysis),
+        relatedContext: toJsonValue(article.relatedContext),
         keywords: article.keywords ?? [],
         category: article.category ?? null,
-        sentiment: (article.sentiment as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        importanceScore: article.importanceScore ?? null,
+        sentiment: toJsonValue(article.sentiment),
+        importanceScore: normalizeImportanceScore(article.importanceScore),
       },
     });
 
@@ -91,9 +126,9 @@ export async function saveNewsArticle(article: AnalyzedNewsArticle): Promise<New
       createdAt: result.createdAt,
     };
   } catch (error) {
-    // 중복 link로 인한 에러는 무시
+    // Race condition 처리 (동시 실행 시 Unique constraint)
     if (getErrorMessage(error).includes("Unique constraint")) {
-      log(`뉴스 중복 건너뜀: ${article.title}`, "warn");
+      log(`뉴스 중복 건너뜀 (race): ${article.title}`, "warn");
       return null;
     }
 
@@ -103,7 +138,9 @@ export async function saveNewsArticle(article: AnalyzedNewsArticle): Promise<New
 }
 
 // 여러 뉴스 기사 일괄 저장
-export async function saveNewsArticles(articles: AnalyzedNewsArticle[]): Promise<number> {
+export async function saveNewsArticles(
+  articles: AnalyzedNewsArticle[]
+): Promise<number> {
   let savedCount = 0;
 
   for (const article of articles) {
@@ -113,7 +150,8 @@ export async function saveNewsArticles(articles: AnalyzedNewsArticle[]): Promise
     }
   }
 
-  log(`총 ${savedCount}/${articles.length}개 뉴스 저장 완료`);
+  const duplicateCount = articles.length - savedCount;
+  log(`총 ${savedCount}/${articles.length}개 뉴스 저장 완료 (${duplicateCount}개 중복 건너뜀)`);
   return savedCount;
 }
 
