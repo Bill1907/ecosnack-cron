@@ -195,3 +195,25 @@ export async function articleExists(link: string): Promise<boolean> {
 
   return count > 0;
 }
+
+/**
+ * 여러 링크에 대해 일괄 존재 여부 확인
+ * @param links - 확인할 링크 배열
+ * @returns 이미 존재하는 링크의 Set
+ */
+export async function getExistingLinks(links: string[]): Promise<Set<string>> {
+  if (links.length === 0) {
+    return new Set();
+  }
+
+  const db = getPrisma();
+
+  const existingArticles = await db.article.findMany({
+    where: {
+      link: { in: links },
+    },
+    select: { link: true },
+  });
+
+  return new Set(existingArticles.map((a) => a.link));
+}

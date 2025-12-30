@@ -17,6 +17,7 @@ import type {
 } from "@/types/index.ts";
 import { log, getErrorMessage } from "@/utils/index.ts";
 import { buildAnalysisPrompt } from "@/services/prompt-builder.ts";
+import { getExistingLinks } from "@/services/database.ts";
 
 // ============================================
 // OpenAI 클라이언트 (싱글톤)
@@ -103,7 +104,7 @@ const DETAILED_ANALYSIS_SYSTEM_PROMPT = `You are an expert economic analyst. Ana
 - time_horizon: "short" (1주 이내), "medium" (1-3개월), "long" (1년 이상)
 
 ## Analysis Focus
-1. headline_summary: 1문장으로 핵심 요약
+1. headline_summary: 2-3문장으로 핵심 요약 (무엇이 일어났는지, 왜 중요한지, 예상 영향 포함)
 2. so_what: 왜 중요한지, 시장 시그널, 영향 기간
 3. impact_analysis: 투자자/직장인/소비자 각각에 미치는 영향
 4. related_context: 배경, 연관 이슈, 향후 주목점
@@ -512,6 +513,43 @@ function generateSimpleSummary(content: string): string {
 }
 
 // ============================================
+// Stage 0: 중복 기사 사전 필터링
+// ============================================
+
+async function filterDuplicates(
+  articles: RawNewsArticle[]
+): Promise<RawNewsArticle[]> {
+  if (articles.length === 0) {
+    return [];
+  }
+
+  log(`Stage 0: ${articles.length}개 기사 중복 필터링 시작...`);
+
+  try {
+    const links = articles.map((a) => a.link);
+    const existingLinks = await getExistingLinks(links);
+
+    if (existingLinks.size === 0) {
+      log(`중복 없음: 모든 기사가 신규`);
+      return articles;
+    }
+
+    const newArticles = articles.filter((a) => !existingLinks.has(a.link));
+    log(
+      `Stage 0 완료: ${existingLinks.size}개 중복 제외, ${newArticles.length}개 신규 기사`
+    );
+    return newArticles;
+  } catch (error) {
+    // Fail-safe: DB 조회 실패 시 경고만 남기고 모든 기사를 그대로 진행
+    log(
+      `중복 필터링 DB 조회 실패, 모든 기사 진행: ${getErrorMessage(error)}`,
+      "warn"
+    );
+    return articles;
+  }
+}
+
+// ============================================
 // 메인 Export
 // ============================================
 
@@ -525,8 +563,16 @@ export async function analyzeNews(
   }
 
   try {
+    // Stage 0: 중복 기사 사전 필터링 (DB에 이미 존재하는 기사 제외)
+    const uniqueArticles = await filterDuplicates(articles);
+
+    if (uniqueArticles.length === 0) {
+      log("모든 기사가 이미 데이터베이스에 존재합니다.");
+      return { success: true, articles: [] };
+    }
+
     // Stage 1: 제목 기반 필터링 (250 → 30)
-    const titleFiltered = await filterByTitles(articles);
+    const titleFiltered = await filterByTitles(uniqueArticles);
 
     // Stage 2: 품질 필터링 + 이미지 추출 (30 → 20)
     const qualityFiltered = await filterByQuality(titleFiltered);

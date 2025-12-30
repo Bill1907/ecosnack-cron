@@ -70,7 +70,10 @@ export const CategorySchema = z
 // ============================================
 
 export const NewsAnalysisResultSchema = z.object({
-  headline_summary: z.string().describe("1문장으로 핵심 요약"),
+  headline_summary: z
+    .string()
+    .min(50)
+    .describe("2-3문장으로 핵심 요약 (무엇이 일어났는지, 왜 중요한지, 예상 영향 포함)"),
   so_what: SoWhatSchema,
   impact_analysis: ImpactAnalysisSchema,
   related_context: RelatedContextSchema,

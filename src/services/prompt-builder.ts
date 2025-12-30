@@ -207,7 +207,7 @@ function buildUserPrompt(article: QualityFilteredArticle): string {
     "",
     "위 기사를 분석하여 다음 정보를 포함한 JSON을 작성하세요:",
     "",
-    "1. **headline_summary**: 1문장으로 핵심 요약",
+    "1. **headline_summary**: 2-3문장으로 핵심 요약 (무엇이 일어났는지, 왜 중요한지, 예상 영향 포함)",
     "2. **so_what**: 왜 중요한지, 시장 시그널, 영향 기간",
     "3. **impact_analysis**: 투자자/직장인/소비자 각각에 미치는 영향",
     "4. **related_context**: 배경, 연관 이슈, 향후 주목점",
