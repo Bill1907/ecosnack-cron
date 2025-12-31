@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import * as cheerio from "cheerio";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { config } from "@/config/index.ts";
+import { z } from "zod";
 import {
   NewsAnalysisResultSchema,
   type NewsAnalysisResult,
@@ -426,7 +427,14 @@ async function analyzeArticleWithAI(
     const parsed = NewsAnalysisResultSchema.parse(JSON.parse(content));
     return parsed;
   } catch (error) {
-    log(`상세 분석 오류 (${article.title.substring(0, 30)}...): ${getErrorMessage(error)}`, "error");
+    const errorMessage = getErrorMessage(error);
+    log(`상세 분석 오류 (${article.title.substring(0, 30)}...): ${errorMessage}`, "error");
+
+    // Zod 검증 에러 상세 로깅
+    if (error instanceof z.ZodError) {
+      log(`Zod 검증 실패 상세: ${JSON.stringify(error.issues)}`, "error");
+    }
+
     return null;
   }
 }
@@ -444,43 +452,28 @@ async function analyzeArticlesInParallel(
 
   const results = await Promise.all(analysisPromises);
 
-  const analyzedArticles: AnalyzedNewsArticle[] = results.map(({ article, analysis }) => {
-    if (analysis) {
-      return {
-        title: article.title,
-        link: article.link,
-        description: article.description,
-        pubDate: article.pubDate,
-        source: article.source,
-        region: article.region,
-        imageUrl: article.imageUrl,
-        headlineSummary: analysis.headline_summary,
-        soWhat: analysis.so_what,
-        impactAnalysis: analysis.impact_analysis,
-        relatedContext: analysis.related_context,
-        keywords: analysis.keywords,
-        category: analysis.category,
-        sentiment: analysis.sentiment,
-        importanceScore: analysis.importance_score,
-      };
-    } else {
-      // 분석 실패시 기본값
-      return {
-        title: article.title,
-        link: article.link,
-        description: article.description,
-        pubDate: article.pubDate,
-        source: article.source,
-        region: article.region,
-        imageUrl: article.imageUrl,
-        headlineSummary: generateSimpleSummary(
-          (article.description?.trim() || "") || article.title
-        ),
-        keywords: [],
-        importanceScore: article.qualityScore,
-      };
-    }
-  });
+  // 분석 성공한 기사만 필터링 (분석 실패 시 저장하지 않음)
+  const analyzedArticles: AnalyzedNewsArticle[] = results
+    .filter((result): result is { article: QualityFilteredArticle; analysis: NewsAnalysisResult } =>
+      result.analysis !== null
+    )
+    .map(({ article, analysis }) => ({
+      title: article.title,
+      link: article.link,
+      description: article.description,
+      pubDate: article.pubDate,
+      source: article.source,
+      region: article.region,
+      imageUrl: article.imageUrl,
+      headlineSummary: analysis.headline_summary,
+      soWhat: analysis.so_what,
+      impactAnalysis: analysis.impact_analysis,
+      relatedContext: analysis.related_context,
+      keywords: analysis.keywords,
+      category: analysis.category,
+      sentiment: analysis.sentiment,
+      importanceScore: analysis.importance_score,
+    }));
 
   const successCount = results.filter((r) => r.analysis !== null).length;
   log(`Stage 3 완료: ${successCount}/${articles.length}개 상세 분석 성공`);
