@@ -16,6 +16,12 @@ import {
   PRACTICAL_INSIGHT_GUIDE,
 } from "@/prompts/chain-of-thought.ts";
 import type { QualityFilteredArticle } from "@/types/index.ts";
+import {
+  getExamplesForPrompt,
+  type RetrievedExample,
+} from "@/services/example-retrieval.ts";
+import type { NewsAnalysisResult } from "@/schemas/news-analysis.ts";
+import { log } from "@/utils/index.ts";
 
 // ============================================
 // 프롬프트 결과 타입
@@ -55,16 +61,36 @@ Respond in valid JSON format matching the required schema.
 /**
  * 기사에 맞는 Few-shot 예시 선택
  */
-function selectRelevantExamples(
+async function selectRelevantExamples(
   article: QualityFilteredArticle
-): AnalysisExample[] {
+): Promise<AnalysisExample[]> {
   const region = article.region as "US" | "KR" | undefined;
   const title = article.title.toLowerCase();
+
+  // 1. DB에서 동적 예시 먼저 검색
+  try {
+    const dbExamples = await getExamplesForPrompt(article, 2);
+
+    if (dbExamples.length > 0) {
+      const converted = dbExamples
+        .map((ex) => convertToAnalysisExample(ex))
+        .filter((ex): ex is AnalysisExample => ex !== null);
+
+      if (converted.length > 0) {
+        log(`동적 Few-shot: DB에서 ${converted.length}개 예시 사용`);
+        return converted;
+      }
+    }
+  } catch (error) {
+    log(`DB 예시 검색 실패, 정적 예시로 폴백: ${error}`, "warn");
+  }
+
+  // 2. 폴백: 정적 예시 사용
+  log("동적 Few-shot: 정적 예시 사용");
 
   // 카테고리 추론
   let inferredCategory: string | null = null;
 
-  // 키워드 기반 카테고리 추론
   const categoryKeywords: Record<string, string[]> = {
     policy: [
       "fed",
@@ -108,7 +134,7 @@ function selectRelevantExamples(
   // 관련 예시 선택 (최대 2개)
   const selectedExamples: AnalysisExample[] = [];
 
-  // 1. 카테고리 매칭 예시
+  // 카테고리 매칭 예시
   if (inferredCategory) {
     const categoryExample = ANALYSIS_EXAMPLES.find(
       (ex) => ex.category === inferredCategory
@@ -118,7 +144,7 @@ function selectRelevantExamples(
     }
   }
 
-  // 2. 지역 매칭 예시 (다른 카테고리에서)
+  // 지역 매칭 예시 (다른 카테고리에서)
   if (region) {
     const regionExample = ANALYSIS_EXAMPLES.find(
       (ex) =>
@@ -136,6 +162,49 @@ function selectRelevantExamples(
   }
 
   return selectedExamples;
+}
+
+
+/**
+ * DB에서 가져온 예시를 AnalysisExample 포맷으로 변환
+ */
+function convertToAnalysisExample(
+  example: RetrievedExample
+): AnalysisExample | null {
+  // 필수 필드 검증
+  if (
+    !example.headlineSummary ||
+    !example.soWhat ||
+    !example.impactAnalysis ||
+    !example.relatedContext
+  ) {
+    return null;
+  }
+
+  try {
+    return {
+      category: example.category ?? "general",
+      input: {
+        title: example.title,
+        description: example.description ?? "",
+        source: example.source ?? "Unknown",
+        region: (example.region as "US" | "KR") ?? "US",
+      },
+      output: {
+        headline_summary: example.headlineSummary,
+        so_what: example.soWhat as NewsAnalysisResult["so_what"],
+        impact_analysis: example.impactAnalysis as NewsAnalysisResult["impact_analysis"],
+        related_context: example.relatedContext as NewsAnalysisResult["related_context"],
+        keywords: example.keywords,
+        category: (example.category ?? "economy") as NewsAnalysisResult["category"],
+        sentiment: (example.sentiment ?? { overall: "neutral", confidence: 0.5 }) as NewsAnalysisResult["sentiment"],
+        importance_score: example.importanceScore ?? 5,
+      },
+      reasoning: `품질 평가 ${example.qualityRating ?? "미평가"}/5 - DB에서 검색된 고품질 분석 예시`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -232,11 +301,11 @@ function buildUserPrompt(article: QualityFilteredArticle): string {
  * @param article - 분석할 기사
  * @returns 시스템 프롬프트와 사용자 프롬프트
  */
-export function buildAnalysisPrompt(
+export async function buildAnalysisPrompt(
   article: QualityFilteredArticle
-): BuiltPrompt {
-  // 관련 예시 선택
-  const examples = selectRelevantExamples(article);
+): Promise<BuiltPrompt> {
+  // 관련 예시 선택 (DB 우선, 정적 예시 폴백)
+  const examples = await selectRelevantExamples(article);
 
   // 프롬프트 생성
   const system = buildSystemPrompt(examples);
@@ -249,7 +318,64 @@ export function buildAnalysisPrompt(
  * 프롬프트 토큰 수 추정 (대략적)
  * GPT-4 기준 약 4글자 = 1토큰
  */
+
+// ============================================
+// 토큰 추정 (tiktoken 대체)
+// ============================================
+
+// GPT 토큰화 근사치: 한글은 글자당 약 1.5-2토큰, 영어는 4자당 약 1토큰
+// 특수문자/숫자는 보통 1-2토큰
+function estimateTokenCount(text: string): number {
+  let tokenCount = 0;
+
+  // 한글 문자 수 (각 글자가 대략 1.5-2 토큰)
+  const koreanChars = (text.match(/[\uAC00-\uD7A3]/g) || []).length;
+  tokenCount += koreanChars * 1.7; // 한글 평균 1.7 토큰/글자
+
+  // 영어 알파벳 (약 4글자당 1토큰)
+  const englishChars = (text.match(/[a-zA-Z]/g) || []).length;
+  tokenCount += englishChars / 3.5; // 영어 평균 3.5자당 1토큰 (GPT 기준)
+
+  // 숫자 (약 2-3자당 1토큰)
+  const digits = (text.match(/[0-9]/g) || []).length;
+  tokenCount += digits / 2.5;
+
+  // 특수문자 및 공백 (각각 대략 1토큰 또는 그 이하)
+  const specialChars = (text.match(/[^\uAC00-\uD7A3a-zA-Z0-9]/g) || []).length;
+  tokenCount += specialChars * 0.5; // 특수문자는 종종 병합됨
+
+  // 안전 마진 추가 (5% 여유)
+  return Math.ceil(tokenCount * 1.05);
+}
+
+/**
+ * 토큰 예산 검증
+ * @param prompt 빌드된 프롬프트
+ * @param maxTokens 최대 허용 토큰
+ * @returns 예산 초과 여부와 추정 토큰 수
+ */
+export function checkTokenBudget(
+  prompt: BuiltPrompt,
+  maxTokens: number = 8000
+): { withinBudget: boolean; estimatedTokens: number; remaining: number } {
+  const estimatedTokens = estimateTokenCount(prompt.system + prompt.user);
+  const remaining = maxTokens - estimatedTokens;
+
+  if (remaining < 0) {
+    log(
+      `⚠️ 토큰 예산 초과: ${estimatedTokens}/${maxTokens} (${Math.abs(remaining)} 초과)`,
+      "warn"
+    );
+  }
+
+  return {
+    withinBudget: remaining >= 0,
+    estimatedTokens,
+    remaining,
+  };
+}
+
 export function estimateTokens(prompt: BuiltPrompt): number {
-  const totalChars = prompt.system.length + prompt.user.length;
-  return Math.ceil(totalChars / 4);
+  const text = prompt.system + prompt.user;
+  return estimateTokenCount(text);
 }

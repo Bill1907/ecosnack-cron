@@ -1,5 +1,6 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach, mock } from "bun:test";
 import { analyzeNews } from "@/services/news-analyzer.ts";
+import * as database from "@/services/database.ts";
 import type { RawNewsArticle } from "@/types/index.ts";
 
 // Bun fetch mock 타입 호환성 해결
@@ -118,15 +119,21 @@ const createMockQualityFilterResponse = (articles: { index: number }[]) => ({
 describe("news-analyzer", () => {
   let consoleSpy: ReturnType<typeof spyOn>;
   let originalFetch: typeof globalThis.fetch;
+  let getExistingLinksSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     consoleSpy = spyOn(console, "log").mockImplementation(() => {});
     originalFetch = globalThis.fetch;
+    // Mock getExistingLinks to return empty set (no duplicates)
+    getExistingLinksSpy = spyOn(database, "getExistingLinks").mockImplementation(
+      async () => new Set<string>()
+    );
   });
 
   afterEach(() => {
     consoleSpy.mockRestore();
     globalThis.fetch = originalFetch;
+    getExistingLinksSpy.mockRestore();
   });
 
   // ============================================

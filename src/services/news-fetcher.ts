@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { RawNewsArticle, FetchResult } from "@/types/index.ts";
-import { log, getErrorMessage } from "@/utils/index.ts";
+import { log, getErrorMessage, withRetry } from "@/utils/index.ts";
 
 // RSS 소스 설정
 interface RssSource {
@@ -148,24 +148,29 @@ async function fetchFromSource(rssSource: RssSource): Promise<RawNewsArticle[]> 
   const { url, source, region } = rssSource;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; EcoSnackBot/1.0)",
-        Accept: "application/rss+xml, application/xml, text/xml, */*",
+    const xml = await withRetry(
+      async () => {
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; EcoSnackBot/1.0)",
+            Accept: "application/rss+xml, application/xml, text/xml, */*",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return response.text();
       },
-    });
+      { retries: 3, delay: 1000 }
+    );
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const xml = await response.text();
     const articles = parseRssFeed(xml, source, region);
-
     log(`[${source}] ${articles.length}개 뉴스 수집`);
     return articles;
   } catch (error) {
-    log(`[${source}] 수집 실패: ${getErrorMessage(error)}`, "error");
+    log(`[${source}] 수집 실패 (재시도 후): ${getErrorMessage(error)}`, "error");
     return [];
   }
 }

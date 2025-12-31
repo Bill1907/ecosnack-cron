@@ -1,5 +1,5 @@
 import { config, validateConfig } from "@/config/index.ts";
-import { initDatabase, closeDatabase, saveNewsArticles } from "@/services/database.ts";
+import { initDatabase, closeDatabase, saveNewsArticlesBatch } from "@/services/database.ts";
 import { fetchAllNews } from "@/services/news-fetcher.ts";
 import { analyzeNews } from "@/services/news-analyzer.ts";
 import { log, getKSTDate, getErrorMessage } from "@/utils/index.ts";
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
       }
 
       // 5. 데이터베이스 저장
-      const savedCount = await saveNewsArticles(analysisResult.articles);
+      const savedCount = await saveNewsArticlesBatch(analysisResult.articles);
       log(`저장 완료: ${savedCount}개 뉴스`);
     }
 

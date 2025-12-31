@@ -76,22 +76,13 @@ export interface AnalysisResult {
   error?: string;
 }
 
-// OpenAI 응답 타입 (필터링용)
-export interface TitleFilterResponse {
-  articles: Array<{
-    index: number;
-    score: number;
-    reason: string;
-  }>;
-}
-
-export interface QualityFilterResponse {
-  articles: Array<{
-    index: number;
-    score: number;
-    reason: string;
-  }>;
-}
-
 // Re-export schema types
-export type { SoWhat, ImpactAnalysis, RelatedContext, Sentiment, Category };
+export type {
+  SoWhat,
+  ImpactAnalysis,
+  RelatedContext,
+  Sentiment,
+  Category,
+  TitleFilterResponse,
+  QualityFilterResponse,
+} from "@/schemas/news-analysis.ts";

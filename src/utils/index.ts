@@ -32,3 +32,37 @@ export function getErrorMessage(error: unknown): string {
   }
   return String(error);
 }
+
+// 재시도 옵션 타입
+export interface RetryOptions {
+  retries?: number;
+  delay?: number;
+  onRetry?: (error: Error, attempt: number) => void;
+}
+
+// 지수 백오프를 적용한 재시도 유틸리티
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const { retries = 3, delay = 1000, onRetry } = options;
+
+  let lastError: Error = new Error("Retry failed");
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt === retries) break;
+
+      const backoffDelay = delay * Math.pow(2, attempt);
+      onRetry?.(lastError, attempt + 1);
+      log(`재시도 ${attempt + 1}/${retries} - ${backoffDelay}ms 후 재시도...`, "warn");
+      await new Promise((r) => setTimeout(r, backoffDelay));
+    }
+  }
+
+  throw lastError;
+}

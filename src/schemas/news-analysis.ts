@@ -92,7 +92,37 @@ export const NewsAnalysisResultSchema = z.object({
     .describe("중요도 점수 (1-10)"),
 });
 
+// ============================================
+// 필터링 응답 스키마
+// ============================================
+
+// 제목 필터링 응답
+export const TitleFilterItemSchema = z.object({
+  index: z.number().int().min(0),
+  score: z.number().min(0).max(100),
+  reason: z.string(),
+});
+
+export const TitleFilterResponseSchema = z.object({
+  articles: z.array(TitleFilterItemSchema),
+});
+
+// 품질 필터링 응답
+export const QualityFilterItemSchema = z.object({
+  index: z.number().int().min(0),
+  score: z.number().min(0).max(100),
+  reason: z.string().optional(),
+});
+
+export const QualityFilterResponseSchema = z.object({
+  articles: z.array(QualityFilterItemSchema),
+});
+
 // 타입 추출
+export type TitleFilterItem = z.infer<typeof TitleFilterItemSchema>;
+export type TitleFilterResponse = z.infer<typeof TitleFilterResponseSchema>;
+export type QualityFilterItem = z.infer<typeof QualityFilterItemSchema>;
+export type QualityFilterResponse = z.infer<typeof QualityFilterResponseSchema>;
 export type SoWhat = z.infer<typeof SoWhatSchema>;
 export type InvestorImpact = z.infer<typeof InvestorImpactSchema>;
 export type WorkerImpact = z.infer<typeof WorkerImpactSchema>;

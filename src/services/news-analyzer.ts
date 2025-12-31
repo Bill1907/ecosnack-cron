@@ -5,6 +5,8 @@ import { config } from "@/config/index.ts";
 import { z } from "zod";
 import {
   NewsAnalysisResultSchema,
+  TitleFilterResponseSchema,
+  QualityFilterResponseSchema,
   type NewsAnalysisResult,
 } from "@/schemas/news-analysis.ts";
 import type {
@@ -16,7 +18,7 @@ import type {
   TitleFilterResponse,
   QualityFilterResponse,
 } from "@/types/index.ts";
-import { log, getErrorMessage } from "@/utils/index.ts";
+import { log, getErrorMessage, withRetry } from "@/utils/index.ts";
 import { buildAnalysisPrompt } from "@/services/prompt-builder.ts";
 import { getExistingLinks } from "@/services/database.ts";
 
@@ -174,23 +176,39 @@ ${articlesForScoring.map((a) => `[${a.index}] "${a.title}" (${a.source})`).join(
 Return scores for ALL articles in JSON format.`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: config.openai.model,
-      messages: [
-        { role: "system", content: TITLE_FILTER_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 2000,
-    });
+    const response = await withRetry(
+      () =>
+        client.chat.completions.create({
+          model: config.openai.model,
+          messages: [
+            { role: "system", content: TITLE_FILTER_SYSTEM_PROMPT },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.3,
+          max_tokens: 2000,
+        }),
+      { retries: 3, delay: 1000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
       throw new Error("Empty response from OpenAI");
     }
 
-    const parsed: TitleFilterResponse = JSON.parse(content);
+    // Zod로 파싱 및 검증
+    const parseResult = TitleFilterResponseSchema.safeParse(JSON.parse(content));
+
+    if (!parseResult.success) {
+      log(`제목 필터링 Zod 검증 실패: ${JSON.stringify(parseResult.error.issues)}`, "error");
+      return batch.map((a) => ({
+        ...a,
+        titleScore: 50,
+        filterReason: "응답 검증 실패로 기본 점수 부여",
+      }));
+    }
+
+    const parsed = parseResult.data;
 
     return batch.map((article, i) => {
       const scoreData = parsed.articles.find((s) => s.index === startIndex + i);
@@ -260,24 +278,41 @@ async function extractImageUrl(articleUrl: string): Promise<string | null> {
 async function extractImagesForArticles(
   articles: TitleFilteredArticle[]
 ): Promise<TitleFilteredArticle[]> {
-  log(`${articles.length}개 기사 이미지 추출 시작...`);
+  log(`${articles.length}개 기사 이미지 추출 시작 (병렬)...`);
 
+  const CONCURRENCY_LIMIT = 5; // 동시 요청 제한
   const results: TitleFilteredArticle[] = [];
-  let successCount = 0;
 
-  for (const article of articles) {
-    const imageUrl = await extractImageUrl(article.link);
-    results.push({
-      ...article,
-      imageUrl: imageUrl ?? undefined,
+  // 배치로 나누어 처리
+  for (let i = 0; i < articles.length; i += CONCURRENCY_LIMIT) {
+    const batch = articles.slice(i, i + CONCURRENCY_LIMIT);
+
+    const batchResults = await Promise.allSettled(
+      batch.map(async (article) => {
+        const imageUrl = await extractImageUrl(article.link);
+        return {
+          ...article,
+          imageUrl: imageUrl ?? undefined,
+        };
+      })
+    );
+
+    // 성공한 결과만 추가 (실패 시 원본 기사 유지)
+    batchResults.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        results.push(result.value);
+      } else {
+        const original = batch[index];
+        if (original) {
+          results.push(original); // 실패 시 원본 유지
+        }
+      }
     });
-
-    if (imageUrl) {
-      successCount++;
-    }
   }
 
+  const successCount = results.filter((r) => r.imageUrl).length;
   log(`이미지 추출 완료: ${successCount}/${articles.length}개 성공`);
+
   return results;
 }
 
@@ -358,23 +393,39 @@ ${articlesForScoring
 Return quality scores for ALL articles in JSON format.`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: config.openai.model,
-      messages: [
-        { role: "system", content: QUALITY_FILTER_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 2000,
-    });
+    const response = await withRetry(
+      () =>
+        client.chat.completions.create({
+          model: config.openai.model,
+          messages: [
+            { role: "system", content: QUALITY_FILTER_SYSTEM_PROMPT },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.3,
+          max_tokens: 2000,
+        }),
+      { retries: 3, delay: 1000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
       throw new Error("Empty response from OpenAI");
     }
 
-    const parsed: QualityFilterResponse = JSON.parse(content);
+    // Zod로 파싱 및 검증
+    const parseResult = QualityFilterResponseSchema.safeParse(JSON.parse(content));
+
+    if (!parseResult.success) {
+      log(`품질 필터링 Zod 검증 실패: ${JSON.stringify(parseResult.error.issues)}`, "error");
+      return articles.map((a) => ({
+        ...a,
+        qualityScore: 50,
+        hasValidImage: !!a.imageUrl,
+      }));
+    }
+
+    const parsed = parseResult.data;
 
     return articles.map((article, i) => {
       const scoreData = parsed.articles.find((s) => s.index === i);
@@ -404,19 +455,23 @@ async function analyzeArticleWithAI(
   const client = getOpenAIClient();
 
   // 동적 프롬프트 생성 (Few-shot, Rubric, CoT 포함)
-  const { system, user } = buildAnalysisPrompt(article);
+  const { system, user } = await buildAnalysisPrompt(article);
 
   try {
-    const response = await client.chat.completions.create({
-      model: config.openai.model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      response_format: zodResponseFormat(NewsAnalysisResultSchema, "news_analysis"),
-      temperature: 0.4,
-      max_tokens: 3000, // 프롬프트가 길어졌으므로 증가
-    });
+    const response = await withRetry(
+      () =>
+        client.chat.completions.create({
+          model: config.openai.model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          response_format: zodResponseFormat(NewsAnalysisResultSchema, "news_analysis"),
+          temperature: 0.4,
+          max_tokens: 3000,
+        }),
+      { retries: 3, delay: 1000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -533,7 +588,6 @@ async function filterDuplicates(
     );
     return newArticles;
   } catch (error) {
-    // Fail-safe: DB 조회 실패 시 경고만 남기고 모든 기사를 그대로 진행
     log(
       `중복 필터링 DB 조회 실패, 모든 기사 진행: ${getErrorMessage(error)}`,
       "warn"
@@ -549,6 +603,7 @@ async function filterDuplicates(
 export async function analyzeNews(
   articles: RawNewsArticle[]
 ): Promise<AnalysisResult> {
+  const startTime = Date.now();
   log(`${articles.length}개 뉴스 분석 시작...`);
 
   if (articles.length === 0) {
@@ -557,7 +612,9 @@ export async function analyzeNews(
 
   try {
     // Stage 0: 중복 기사 사전 필터링 (DB에 이미 존재하는 기사 제외)
+    const stage0Start = Date.now();
     const uniqueArticles = await filterDuplicates(articles);
+    const stage0Time = Date.now() - stage0Start;
 
     if (uniqueArticles.length === 0) {
       log("모든 기사가 이미 데이터베이스에 존재합니다.");
@@ -565,16 +622,44 @@ export async function analyzeNews(
     }
 
     // Stage 1: 제목 기반 필터링 (250 → 30)
+    const stage1Start = Date.now();
     const titleFiltered = await filterByTitles(uniqueArticles);
+    const stage1Time = Date.now() - stage1Start;
 
     // Stage 2: 품질 필터링 + 이미지 추출 (30 → 20)
+    const stage2Start = Date.now();
     const qualityFiltered = await filterByQuality(titleFiltered);
+    const stage2Time = Date.now() - stage2Start;
 
     // Stage 3: 상세 AI 분석 (20개 병렬 처리)
+    const stage3Start = Date.now();
     const analyzedArticles = await analyzeArticlesInParallel(qualityFiltered);
+    const stage3Time = Date.now() - stage3Start;
 
     const withImages = analyzedArticles.filter((a) => a.imageUrl);
     const withFullAnalysis = analyzedArticles.filter((a) => a.soWhat);
+
+    // 메트릭 계산 및 로깅
+    const totalTime = Date.now() - startTime;
+    const metrics = {
+      total_articles: articles.length,
+      unique_articles: uniqueArticles.length,
+      stage0_duplicate_rate: ((articles.length - uniqueArticles.length) / articles.length).toFixed(2),
+      stage1_pass_rate: (titleFiltered.length / uniqueArticles.length).toFixed(2),
+      stage2_pass_rate: titleFiltered.length > 0 ? (qualityFiltered.length / titleFiltered.length).toFixed(2) : "0.00",
+      stage3_success_rate: qualityFiltered.length > 0 ? (withFullAnalysis.length / qualityFiltered.length).toFixed(2) : "0.00",
+      final_with_images: withImages.length,
+      final_with_analysis: withFullAnalysis.length,
+      timing_ms: {
+        stage0_dedup: stage0Time,
+        stage1_title: stage1Time,
+        stage2_quality: stage2Time,
+        stage3_analysis: stage3Time,
+        total: totalTime,
+      },
+    };
+
+    log(`📊 분석 메트릭: ${JSON.stringify(metrics)}`);
 
     log(
       `총 ${analyzedArticles.length}/${articles.length}개 뉴스 분석 완료 (이미지: ${withImages.length}개, 상세분석: ${withFullAnalysis.length}개)`

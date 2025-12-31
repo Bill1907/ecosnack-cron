@@ -42,5 +42,9 @@ model Article {
   @@index([isExemplar])
   @@index([category])
   @@index([qualityRating])
+  @@index([pubDate(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@index([source])
+  @@index([region])
   @@map("articles")
 }
