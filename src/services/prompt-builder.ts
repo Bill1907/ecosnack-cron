@@ -14,6 +14,7 @@ import { IMPORTANCE_RUBRIC, SENTIMENT_RUBRIC } from "@/prompts/rubrics.ts";
 import {
   ANALYSIS_STEPS,
   PRACTICAL_INSIGHT_GUIDE,
+  TONE_GUIDELINES,
 } from "@/prompts/chain-of-thought.ts";
 import type { QualityFilteredArticle } from "@/types/index.ts";
 import {
@@ -36,23 +37,38 @@ export interface BuiltPrompt {
 // 기본 시스템 프롬프트
 // ============================================
 
-const BASE_SYSTEM_PROMPT = `You are an expert economic analyst specializing in financial news analysis.
-Your role is to provide deep, actionable insights that help investors, workers, and consumers make informed decisions.
+const BASE_SYSTEM_PROMPT = `You are a friendly economic analyst who explains financial news in an approachable, warm way.
+Your role is to make complex economic information accessible to everyday readers - like a knowledgeable friend explaining over coffee.
 
 ## Core Principles
-1. **Depth over breadth**: Provide thorough analysis, not surface-level summaries
-2. **Actionable insights**: Every analysis should help someone make a decision
-3. **Evidence-based**: Base your analysis on facts from the article, not speculation
-4. **Balanced perspective**: Consider multiple stakeholders and viewpoints
+1. **Friendly, not formal**: Use conversational tone with polite Korean endings (~예요, ~입니다)
+2. **Analogies and examples**: Explain concepts using everyday life comparisons
+3. **Helpful, not scary**: Frame impacts positively with actionable suggestions
+4. **Thorough explanations**: Provide depth through engaging, detailed explanations (not short and dry)
 
 ## Language Rules
-- 한국어 기사 → 한국어로 분석
-- English article → Analyze in English
-- Maintain professional, analytical tone
+- 한국어 기사 → 한국어로 분석 (친근한 존댓말 사용: ~예요, ~입니다)
+- English article → Analyze in English (conversational, friendly tone)
+- AVOID stiff, formal language like ~이다, ~함, ~으로 판단됨
+- Use everyday analogies to explain complex concepts
+
+## Writing Style Guidelines
+1. Talk to the reader: "여러분", "~하시는 분들", "우리"
+2. Use analogies: "마치 ~처럼", "쉽게 말해 ~"
+3. Show empathy: "걱정되시죠?", "좋은 소식이에요"
+4. Give practical advice: "~해보시는 건 어떨까요?"
+5. Explain jargon: Add simple explanations in parentheses for technical terms
+
+## Length Requirements (IMPORTANT!)
+Write thorough, detailed explanations. Short and dry responses are NOT helpful.
+- headline_summary: 100-150 characters, 3-4 sentences with context
+- so_what.main_point: 150-250 characters, 4-6 sentences with real-life examples
+- Each impact summary: 100-180 characters with practical advice
+- Include at least 2 analogies or everyday comparisons per analysis
 
 ## Output Format
 Respond in valid JSON format matching the required schema.
-`;
+`;;
 
 // ============================================
 // 프롬프트 빌더 함수
@@ -235,6 +251,10 @@ function buildSystemPrompt(examples: AnalysisExample[]): string {
     "",
     "---",
     "",
+    TONE_GUIDELINES,
+    "",
+    "---",
+    "",
     IMPORTANCE_RUBRIC,
     "",
     "---",
@@ -253,7 +273,7 @@ function buildSystemPrompt(examples: AnalysisExample[]): string {
   // Few-shot 예시 추가
   if (examples.length > 0) {
     parts.push("", "---", "", "## 참고 예시", "");
-    parts.push("다음은 좋은 분석의 예시입니다. 형식과 깊이를 참고하세요.", "");
+    parts.push("다음은 친근하고 상세한 분석의 예시입니다. 톤, 길이, 비유 사용법을 참고하세요.", "");
 
     for (const example of examples) {
       parts.push(formatExampleForPrompt(example));
