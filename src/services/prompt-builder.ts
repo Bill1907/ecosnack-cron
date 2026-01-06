@@ -10,11 +10,12 @@ import {
   formatExampleForPrompt,
   type AnalysisExample,
 } from "@/prompts/examples.ts";
-import { IMPORTANCE_RUBRIC, SENTIMENT_RUBRIC } from "@/prompts/rubrics.ts";
+import { IMPORTANCE_RUBRIC, SENTIMENT_RUBRIC, CATEGORY_RUBRIC, TIME_HORIZON_RUBRIC } from "@/prompts/rubrics.ts";
 import {
   ANALYSIS_STEPS,
   PRACTICAL_INSIGHT_GUIDE,
   TONE_GUIDELINES,
+  getCoTTemplate,
 } from "@/prompts/chain-of-thought.ts";
 import type { QualityFilteredArticle } from "@/types/index.ts";
 import {
@@ -37,38 +38,62 @@ export interface BuiltPrompt {
 // 기본 시스템 프롬프트
 // ============================================
 
-const BASE_SYSTEM_PROMPT = `You are a friendly economic analyst who explains financial news in an approachable, warm way.
-Your role is to make complex economic information accessible to everyday readers - like a knowledgeable friend explaining over coffee.
+// ============================================
+// 핵심 규칙 (MUST) - 반드시 준수
+// ============================================
 
-## Core Principles
-1. **Friendly, not formal**: Use conversational tone with polite Korean endings (~예요, ~입니다)
-2. **Analogies and examples**: Explain concepts using everyday life comparisons
-3. **Helpful, not scary**: Frame impacts positively with actionable suggestions
-4. **Thorough explanations**: Provide depth through engaging, detailed explanations (not short and dry)
+const CORE_INSTRUCTIONS = `
+## 🚨 핵심 규칙 (MUST - 반드시 준수)
 
-## Language Rules
-- 한국어 기사 → 한국어로 분석 (친근한 존댓말 사용: ~예요, ~입니다)
-- English article → Analyze in English (conversational, friendly tone)
-- AVOID stiff, formal language like ~이다, ~함, ~으로 판단됨
-- Use everyday analogies to explain complex concepts
+1. **친근한 톤 사용**: ~예요, ~입니다 형태의 존댓말 (딱딱한 ~이다, ~함 금지)
+2. **비유/예시 최소 2개**: 일상생활 비유로 어려운 개념 설명
+3. **길이 가이드라인 준수**: 
+   - headline_summary: 100자 이상, 3-4문장
+   - main_point: 150자 이상, 4-6문장
+   - 각 impact summary: 100자 이상
+4. **JSON 형식 출력**: 요청된 스키마에 맞게 출력
+5. **언어 규칙**:
+   - 한국어 기사 → 한국어 분석
+   - English article → English analysis
+`;
 
-## Writing Style Guidelines
-1. Talk to the reader: "여러분", "~하시는 분들", "우리"
-2. Use analogies: "마치 ~처럼", "쉽게 말해 ~"
-3. Show empathy: "걱정되시죠?", "좋은 소식이에요"
-4. Give practical advice: "~해보시는 건 어떨까요?"
-5. Explain jargon: Add simple explanations in parentheses for technical terms
+// ============================================
+// 권장 사항 (SHOULD) - 가능한 준수
+// ============================================
 
-## Length Requirements (IMPORTANT!)
-Write thorough, detailed explanations. Short and dry responses are NOT helpful.
-- headline_summary: 100-150 characters, 3-4 sentences with context
-- so_what.main_point: 150-250 characters, 4-6 sentences with real-life examples
-- Each impact summary: 100-180 characters with practical advice
-- Include at least 2 analogies or everyday comparisons per analysis
+const GUIDELINES = `
+## 💡 권장 사항 (SHOULD - 가능한 준수)
+
+### 독자와의 소통
+- 독자에게 말 걸기: "여러분", "~하시는 분들"
+- 공감 표현: "걱정되시죠?", "좋은 소식이에요"
+- 실용적 조언: "~해보시는 건 어떨까요?"
+
+### 전문용어 처리
+- 괄호 안에 쉬운 설명 추가
+- 예: "FOMC(연방공개시장위원회, 미국 금리를 결정하는 회의)"
+
+### 구체성
+- 수치/기간 명시: "앞으로 3개월 정도"
+- 영향 경로 설명: "금리 인상 → 대출 이자 상승 → 소비 위축"
+- 대상별 맞춤 조언 제공
+`;
+
+// ============================================
+// 기본 시스템 프롬프트 (통합)
+// ============================================
+
+const BASE_SYSTEM_PROMPT = `당신은 친근한 경제 분석가입니다.
+경제 뉴스를 이해하기 쉽게 설명하는 역할을 합니다.
+마치 경제에 밝은 친한 선배가 커피 마시며 설명해주는 느낌으로요.
+
+${CORE_INSTRUCTIONS}
+
+${GUIDELINES}
 
 ## Output Format
 Respond in valid JSON format matching the required schema.
-`;;
+`;
 
 // ============================================
 // 프롬프트 빌더 함수
@@ -137,6 +162,45 @@ async function selectRelevantExamples(
       "실업률",
       "unemployment",
       "물가",
+    ],
+    markets: [
+      "코스피",
+      "코스닥",
+      "S&P",
+      "나스닥",
+      "주가",
+      "상승",
+      "하락",
+      "지수",
+      "nasdaq",
+      "dow",
+      "rally",
+      "증시",
+      "주식시장",
+    ],
+    trade: [
+      "수출",
+      "수입",
+      "무역",
+      "관세",
+      "tariff",
+      "supply chain",
+      "공급망",
+      "FTA",
+      "통상",
+      "교역",
+    ],
+    finance: [
+      "대출",
+      "예금",
+      "은행",
+      "보험",
+      "카드",
+      "금융",
+      "banking",
+      "loan",
+      "저축",
+      "핀테크",
     ],
   };
 
@@ -243,9 +307,48 @@ function formatArticleInfo(article: QualityFilteredArticle): string {
 }
 
 /**
+ * 기사 복잡도 추정 (CoT 템플릿 선택용)
+ */
+function estimateArticleComplexity(
+  article: QualityFilteredArticle
+): "high" | "medium" | "low" {
+  const descLength = article.description?.length ?? 0;
+  const titleLength = article.title.length;
+  
+  // 수치/퍼센트/금액 포함 여부
+  const hasNumbers = /\d+%|\$\d+|₩\d+|억원|조원/.test(
+    `${article.title} ${article.description ?? ""}`
+  );
+  
+  // 복잡한 키워드 (정책, 거시경제 등)
+  const complexKeywords = /금리|GDP|인플레이션|FOMC|연준|한은|물가|정책/.test(
+    `${article.title} ${article.description ?? ""}`
+  );
+
+  // 높은 복잡도: 긴 설명 + 수치 + 복잡 키워드
+  if (descLength > 400 && hasNumbers && complexKeywords) {
+    return "high";
+  }
+  
+  // 중간 복잡도: 어느 정도 길이가 있고 수치 있음
+  if (descLength > 150 || (titleLength > 30 && hasNumbers)) {
+    return "medium";
+  }
+  
+  return "low";
+}
+
+/**
  * 전체 시스템 프롬프트 생성
  */
-function buildSystemPrompt(examples: AnalysisExample[]): string {
+function buildSystemPrompt(
+  examples: AnalysisExample[],
+  article?: QualityFilteredArticle
+): string {
+  // 기사 복잡도에 따른 CoT 템플릿 선택
+  const complexity = article ? estimateArticleComplexity(article) : "medium";
+  const cotTemplate = getCoTTemplate(complexity);
+
   const parts = [
     BASE_SYSTEM_PROMPT,
     "",
@@ -263,7 +366,15 @@ function buildSystemPrompt(examples: AnalysisExample[]): string {
     "",
     "---",
     "",
-    ANALYSIS_STEPS,
+    CATEGORY_RUBRIC,
+    "",
+    "---",
+    "",
+    TIME_HORIZON_RUBRIC,
+    "",
+    "---",
+    "",
+    cotTemplate,  // 동적 CoT 템플릿 적용
     "",
     "---",
     "",
@@ -327,8 +438,8 @@ export async function buildAnalysisPrompt(
   // 관련 예시 선택 (DB 우선, 정적 예시 폴백)
   const examples = await selectRelevantExamples(article);
 
-  // 프롬프트 생성
-  const system = buildSystemPrompt(examples);
+  // 프롬프트 생성 (기사 복잡도에 따른 동적 CoT 템플릿 적용)
+  const system = buildSystemPrompt(examples, article);
   const user = buildUserPrompt(article);
 
   return { system, user };
