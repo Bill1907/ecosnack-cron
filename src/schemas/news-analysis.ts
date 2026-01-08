@@ -8,55 +8,55 @@ import { z } from "zod";
 export const SoWhatSchema = z.object({
   main_point: z
     .string()
-    .min(150)
-    .describe("이 뉴스가 중요한 이유 (4-6문장, 친근한 톤으로 비유와 예시 포함). 독자가 '그래서 나한테 뭔 영향이지?'에 답하는 내용"),
+    .min(200)
+    .describe("이 뉴스가 중요한 이유 (5-7문장, 친근한 톤). 반드시 1개 이상의 실생활 비유/예시 포함. 독자가 '그래서 나한테 뭔 영향이지?'에 답하는 내용"),
   market_signal: z
     .string()
-    .min(80)
-    .describe("시장에 주는 시그널 (긍정/부정/중립 + 쉬운 설명 포함). 왜 그런지 근거도 친근하게 설명"),
+    .min(120)
+    .describe("시장에 주는 시그널 (긍정/부정/중립 + 쉬운 설명). 구체적 근거와 영향 경로를 친근하게 설명"),
   time_horizon: z
     .enum(["short", "medium", "long"])
     .describe("단기(1주)/중기(1-3개월)/장기(1년+) 영향 구분"),
-});;
+});
 
 // 투자자 영향 분석
 export const InvestorImpactSchema = z.object({
   summary: z
     .string()
-    .min(100)
-    .describe("투자자에게 미치는 영향 요약 (3-4문장, 친근한 톤으로 실질적 조언 포함)"),
+    .min(150)
+    .describe("투자자에게 미치는 영향 요약 (4-5문장, 친근한 톤). 실생활 비유 1개 이상, 구체적 수치/기간 포함 권장"),
   action_items: z.array(z.string()).describe("구체적 대응 방안 (친근한 제안 형태: ~해보세요, ~고려해보시는 건 어떨까요)"),
-  sectors_affected: z.array(z.string()).describe("영향받는 섹터/종목 (수혜/타격 구분하여 설명)"),
-});;
+  sectors_affected: z.array(z.string()).describe("영향받는 섹터/종목 (수혜/타격 구분, 각각 이유 간략 설명)"),
+});
 
 // 직장인/노동자 영향 분석
 export const WorkerImpactSchema = z.object({
   summary: z
     .string()
-    .min(100)
-    .describe("직장인/노동자에게 미치는 영향 (3-4문장, 공감하는 톤으로 실질적인 정보 제공)"),
-  industries_affected: z.array(z.string()).describe("영향받는 산업군 (구체적인 영향도 함께 설명)"),
+    .min(150)
+    .describe("직장인/노동자에게 미치는 영향 (4-5문장, 공감하는 톤). 실제 직장인 관점의 예시 포함"),
+  industries_affected: z.array(z.string()).describe("영향받는 산업군 (긍정/부정 구분, 각각 구체적 영향 설명)"),
   job_outlook: z
     .string()
-    .min(50)
-    .describe("고용 전망 변화 (희망적인 부분도 함께 언급, 구체적 조언 포함)"),
-});;
+    .min(80)
+    .describe("고용 전망 변화 (희망적 부분도 언급, 구체적 기간/조언 포함)"),
+});
 
 // 소비자 영향 분석
 export const ConsumerImpactSchema = z.object({
   summary: z
     .string()
-    .min(100)
-    .describe("소비자에게 미치는 영향 (3-4문장, 일상생활과 연결하여 친근하게 설명)"),
+    .min(150)
+    .describe("소비자에게 미치는 영향 (4-5문장). 장보기, 외식, 쇼핑 등 일상 상황 예시 1개 이상 포함"),
   price_impact: z
     .string()
-    .min(40)
-    .describe("물가/생활비 영향 (구체적인 품목이나 상황 예시 포함)"),
+    .min(80)
+    .describe("물가/생활비 영향 (구체적 품목/상황 예시 포함, 예: 마트 장보기, 휘발유값 등)"),
   spending_advice: z
     .string()
-    .min(50)
-    .describe("소비 관련 조언 (구체적이고 실행 가능한 친근한 제안: ~해보세요, ~추천드려요)"),
-});;
+    .min(80)
+    .describe("소비 관련 조언 (구체적이고 실행 가능한 제안 2개 이상: ~해보세요, ~추천드려요)"),
+});
 
 // 전체 영향 분석
 export const ImpactAnalysisSchema = z.object({
@@ -69,14 +69,14 @@ export const ImpactAnalysisSchema = z.object({
 export const RelatedContextSchema = z.object({
   background: z
     .string()
-    .min(100)
-    .describe("이 뉴스의 배경/맥락 설명 (3-4문장, 비유나 예시로 쉽게 풀어서 설명)"),
-  related_events: z.array(z.string()).describe("연관된 최근 이슈들 (각 이슈의 의미도 간단히 설명)"),
+    .min(150)
+    .describe("이 뉴스의 배경/맥락 설명 (4-5문장). 역사적 맥락이나 트렌드를 비유로 쉽게 설명"),
+  related_events: z.array(z.string()).describe("연관된 최근 이슈들 (각 이슈가 왜 관련있는지 간략 설명)"),
   what_to_watch: z
     .string()
-    .min(60)
-    .describe("앞으로 주목할 후속 이벤트 (구체적인 시점과 의미 설명, 뉴스 챙겨보시라는 조언 포함)"),
-});;
+    .min(100)
+    .describe("앞으로 주목할 후속 이벤트 (구체적 시점/날짜 명시, 뉴스 챙겨보시라는 조언 포함)"),
+});
 
 // 감성 분석
 export const SentimentSchema = z.object({
@@ -102,8 +102,8 @@ export const CategorySchema = z
 export const NewsAnalysisResultSchema = z.object({
   headline_summary: z
     .string()
-    .min(100)
-    .describe("3-4문장으로 핵심 요약 (친근한 톤으로 무엇이 일어났는지, 왜 중요한지, 예상 영향 포함. 독자에게 말 걸듯이 작성)"),
+    .min(150)
+    .describe("4-5문장으로 핵심 요약 (친근한 톤). 무엇이 일어났는지 + 왜 중요한지 + 예상 영향을 독자에게 말 걸듯이 작성"),
   so_what: SoWhatSchema,
   impact_analysis: ImpactAnalysisSchema,
   related_context: RelatedContextSchema,
