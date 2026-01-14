@@ -1,3 +1,17 @@
+// pubDate 기반 최신성 점수 계산 (0-20점)
+export function calculateRecencyScore(pubDate?: Date | null): number {
+  if (!pubDate) return 0;
+
+  const diffHours = (Date.now() - pubDate.getTime()) / (1000 * 60 * 60);
+
+  if (diffHours < 0) return 10; // 미래 날짜 (파싱 오류)
+  if (diffHours <= 1) return 20;
+  if (diffHours <= 6) return 15;
+  if (diffHours <= 12) return 10;
+  if (diffHours <= 24) return 5;
+  return 0;
+}
+
 // 한국 시간으로 현재 시각 반환
 export function getKSTDate(): Date {
   return new Date(

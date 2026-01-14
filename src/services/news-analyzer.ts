@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import * as cheerio from "cheerio";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { config } from "@/config/index.ts";
+import { calculateRecencyScore } from "@/utils/index.ts";
 import { z } from "zod";
 import {
   NewsAnalysisResultSchema,
@@ -150,11 +151,15 @@ async function filterByTitles(
     allScored.push(...scoredBatch);
   }
 
-  // 점수순 정렬 후 상위 N개 선택
-  allScored.sort((a, b) => b.titleScore - a.titleScore);
+  // 복합 점수(titleScore + recencyScore)순 정렬 후 상위 N개 선택
+  allScored.sort((a, b) => {
+    const compositeA = a.titleScore + calculateRecencyScore(a.pubDate);
+    const compositeB = b.titleScore + calculateRecencyScore(b.pubDate);
+    return compositeB - compositeA;
+  });
   const filtered = allScored.slice(0, config.openai.titleFilterLimit);
 
-  log(`Stage 1 완료: ${filtered.length}개 기사 선별 (최고점: ${filtered[0]?.titleScore}, 최저점: ${filtered[filtered.length - 1]?.titleScore})`);
+  log(`Stage 1 완료: ${filtered.length}개 기사 선별 (최고점: ${filtered[0]?.titleScore}, 최저점: ${filtered[filtered.length - 1]?.titleScore}, 최신성 가산점 적용)`);
   return filtered;
 }
 
@@ -320,6 +325,16 @@ async function extractImagesForArticles(
 // Stage 2: 품질 필터링 (30 → 20)
 // ============================================
 
+function sortByCompositeQualityScore(
+  articles: QualityFilteredArticle[]
+): QualityFilteredArticle[] {
+  return [...articles].sort((a, b) => {
+    const compositeA = a.qualityScore + calculateRecencyScore(a.pubDate);
+    const compositeB = b.qualityScore + calculateRecencyScore(b.pubDate);
+    return compositeB - compositeA;
+  });
+}
+
 async function filterByQuality(
   articles: TitleFilteredArticle[]
 ): Promise<QualityFilteredArticle[]> {
@@ -334,30 +349,30 @@ async function filterByQuality(
 
   if (hasImage.length >= config.openai.qualityFilterLimit) {
     const qualityScored = await scoreQualityBatch(hasImage);
-    qualityScored.sort((a, b) => b.qualityScore - a.qualityScore);
-    const result = qualityScored.slice(0, config.openai.qualityFilterLimit);
-    log(`Stage 2 완료: ${result.length}개 기사 선별 (이미지 있는 기사만)`);
+    const sorted = sortByCompositeQualityScore(qualityScored);
+    const result = sorted.slice(0, config.openai.qualityFilterLimit);
+    log(`Stage 2 완료: ${result.length}개 기사 선별 (이미지 있는 기사만, 최신성 가산점 적용)`);
     return result;
   }
 
   const qualityScoredWithImage = await scoreQualityBatch(hasImage);
-  qualityScoredWithImage.sort((a, b) => b.qualityScore - a.qualityScore);
+  const sortedWithImage = sortByCompositeQualityScore(qualityScoredWithImage);
 
   const remaining = config.openai.qualityFilterLimit - hasImage.length;
-  let qualityScoredNoImage: QualityFilteredArticle[] = [];
+  let sortedNoImage: QualityFilteredArticle[] = [];
 
   if (remaining > 0 && noImage.length > 0) {
-    qualityScoredNoImage = await scoreQualityBatch(noImage);
-    qualityScoredNoImage.sort((a, b) => b.qualityScore - a.qualityScore);
+    const qualityScoredNoImage = await scoreQualityBatch(noImage);
+    sortedNoImage = sortByCompositeQualityScore(qualityScoredNoImage);
   }
 
   const result = [
-    ...qualityScoredWithImage,
-    ...qualityScoredNoImage.slice(0, remaining),
+    ...sortedWithImage,
+    ...sortedNoImage.slice(0, remaining),
   ];
 
   log(
-    `Stage 2 완료: ${result.length}개 기사 선별 (이미지 ${qualityScoredWithImage.length}개 + 비이미지 ${Math.min(remaining, qualityScoredNoImage.length)}개)`
+    `Stage 2 완료: ${result.length}개 기사 선별 (이미지 ${sortedWithImage.length}개 + 비이미지 ${Math.min(remaining, sortedNoImage.length)}개, 최신성 가산점 적용)`
   );
   return result;
 }
