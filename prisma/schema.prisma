@@ -48,3 +48,26 @@ model Article {
   @@index([region])
   @@map("articles")
 }
+
+model DailyReport {
+  id                  Int       @id @default(autoincrement())
+  reportDate          DateTime  @unique @map("report_date") @db.Date
+  title               String    @db.Text
+
+  // 핵심 3대 섹션
+  executiveSummary    Json      @map("executive_summary") @db.JsonB
+  marketOverview      Json      @map("market_overview") @db.JsonB
+  keyInsights         Json      @map("key_insights") @db.JsonB
+
+  // 부가 정보
+  topKeywords         String[]  @map("top_keywords")
+  sentimentAnalysis   Json      @map("sentiment_analysis") @db.JsonB
+
+  // 메타데이터
+  articleCount        Int       @map("article_count")
+  articleIds          Int[]     @map("article_ids")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([reportDate(sort: Desc)])
+  @@map("daily_reports")
+}
