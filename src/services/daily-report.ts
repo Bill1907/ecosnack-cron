@@ -18,6 +18,14 @@ import {
 } from "@/types/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
 import { log, getErrorMessage, withRetry, getKSTDate } from "@/utils/index.ts";
+import {
+  validateEvidence,
+  calculateEvidenceScore,
+} from "@/services/evidence-validator.ts";
+import {
+  evaluateReportQuality,
+  calculateFinalQualityScore,
+} from "@/services/quality-evaluator.ts";
 
 // ============================================
 // OpenAI 클라이언트
@@ -298,9 +306,9 @@ function transformAIResponseToReportData(
     implications: insight.implications,
     evidence: insight.evidence.map((e): EvidenceItem => ({
       text: e.text,
-      articleId: e.articleId,
+      articleId: e.articleId ?? undefined,
       articleUrl: e.articleId ? buildArticleUrl(e.articleId) : undefined,
-      source: e.source,
+      source: e.source ?? undefined,
     })),
     relatedArticles: buildRelatedArticlesFromIds(insight.relatedArticleIds, articlesMap),
     actionItems: insight.actionItems,
@@ -363,17 +371,25 @@ function transformAIResponseToReportData(
 // 메인 함수: 데일리 리포트 생성
 // ============================================
 
+export interface GenerateDailyReportOptions {
+  skipQualityEvaluation?: boolean;
+  skipEvidenceRelevanceCheck?: boolean; // AI 관련성 검증 스킵 (비용 절감)
+}
+
 export interface GenerateDailyReportResult {
   success: boolean;
   reportId?: number;
   reportDate?: Date;
   articleCount?: number;
+  qualityScore?: number;
   error?: string;
 }
 
 export async function generateDailyReport(
-  targetDate?: Date
+  targetDate?: Date,
+  options: GenerateDailyReportOptions = {}
 ): Promise<GenerateDailyReportResult> {
+  const { skipQualityEvaluation = false, skipEvidenceRelevanceCheck = false } = options;
   const date = targetDate ?? getKSTDate();
   const dateStr = date.toISOString().split("T")[0];
 
@@ -408,7 +424,35 @@ export async function generateDailyReport(
     // 3. 데이터 변환
     const reportData = transformAIResponseToReportData(aiResponse, articles, date);
 
-    // 4. DB 저장
+    // 4. 품질 평가 (선택적)
+    if (!skipQualityEvaluation) {
+      try {
+        // 4-1. 근거 검증
+        log("근거 검증 시작...");
+        const evidenceValidation = await validateEvidence(reportData, articles, {
+          checkRelevance: !skipEvidenceRelevanceCheck,
+        });
+        reportData.evidenceValidation = evidenceValidation;
+
+        // 4-2. AI 품질 평가
+        log("AI 품질 평가 시작...");
+        const qualityEvaluation = await evaluateReportQuality(reportData);
+        reportData.qualityEvaluation = qualityEvaluation;
+
+        // 4-3. 종합 점수 계산
+        const evidenceScore = calculateEvidenceScore(evidenceValidation);
+        const finalScore = calculateFinalQualityScore(qualityEvaluation, evidenceScore);
+        reportData.qualityScore = finalScore;
+
+        log(`품질 평가 완료 - 종합 점수: ${finalScore}/100 (AI: ${qualityEvaluation.overallScore}, 근거: ${evidenceScore})`);
+      } catch (evalError) {
+        log(`품질 평가 중 오류 발생 (리포트 저장은 계속): ${getErrorMessage(evalError)}`, "warn");
+      }
+    } else {
+      log("품질 평가 스킵됨 (옵션에 의해)");
+    }
+
+    // 5. DB 저장
     const savedReport = await saveDailyReport(reportData);
     log(`데일리 리포트 저장 완료 (ID: ${savedReport.id})`);
 
@@ -417,6 +461,7 @@ export async function generateDailyReport(
       reportId: savedReport.id,
       reportDate: savedReport.reportDate,
       articleCount: savedReport.articleCount,
+      qualityScore: reportData.qualityScore,
     };
   } catch (error) {
     const errorMessage = getErrorMessage(error);
@@ -460,6 +505,9 @@ export async function saveDailyReport(
       sentimentAnalysis: report.sentimentAnalysis as unknown as Prisma.InputJsonValue,
       articleCount: report.articleCount,
       articleIds: report.articleIds,
+      qualityEvaluation: report.qualityEvaluation as unknown as Prisma.InputJsonValue,
+      evidenceValidation: report.evidenceValidation as unknown as Prisma.InputJsonValue,
+      qualityScore: report.qualityScore,
     },
     update: {
       title: report.title,
@@ -470,6 +518,9 @@ export async function saveDailyReport(
       sentimentAnalysis: report.sentimentAnalysis as unknown as Prisma.InputJsonValue,
       articleCount: report.articleCount,
       articleIds: report.articleIds,
+      qualityEvaluation: report.qualityEvaluation as unknown as Prisma.InputJsonValue,
+      evidenceValidation: report.evidenceValidation as unknown as Prisma.InputJsonValue,
+      qualityScore: report.qualityScore,
     },
   });
 
@@ -510,6 +561,9 @@ export async function getDailyReport(
     sentimentAnalysis: report.sentimentAnalysis as unknown as DailyReportData["sentimentAnalysis"],
     articleCount: report.articleCount,
     articleIds: report.articleIds,
+    qualityEvaluation: report.qualityEvaluation as unknown as DailyReportData["qualityEvaluation"],
+    evidenceValidation: report.evidenceValidation as unknown as DailyReportData["evidenceValidation"],
+    qualityScore: report.qualityScore ?? undefined,
   };
 }
 

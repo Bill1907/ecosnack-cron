@@ -68,6 +68,11 @@ model DailyReport {
   articleIds          Int[]     @map("article_ids")
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
+  // 품질 평가 (AI Self-Evaluation + 근거 검증)
+  qualityEvaluation   Json?     @map("quality_evaluation") @db.JsonB
+  evidenceValidation  Json?     @map("evidence_validation") @db.JsonB
+  qualityScore        Float?    @map("quality_score")
+
   @@index([reportDate(sort: Desc)])
   @@map("daily_reports")
 }

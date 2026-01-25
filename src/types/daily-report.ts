@@ -2,6 +2,8 @@
 // 데일리 리포트 타입 정의
 // ============================================
 
+import type { QualityEvaluation, EvidenceValidation } from "@/schemas/quality-evaluation.ts";
+
 // 기사 URL 베이스
 export const ARTICLE_BASE_URL = "https://heyvoan.com/article";
 
@@ -107,6 +109,11 @@ export interface DailyReportData {
 
   articleCount: number;
   articleIds: number[];
+
+  // 품질 평가 (선택적)
+  qualityEvaluation?: QualityEvaluation;
+  evidenceValidation?: EvidenceValidation;
+  qualityScore?: number;
 }
 
 // ============================================
