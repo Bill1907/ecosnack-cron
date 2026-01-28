@@ -70,14 +70,19 @@ const DAILY_REPORT_SYSTEM_PROMPT = `당신은 전문 경제 애널리스트입�
 3. **Key Insights**
    - 2-5개의 핵심 인사이트
    - 각각 심층 분석과 함께 투자자/직장인/소비자 별 영향 분석
-   - 근거(evidence)에 관련 기사 ID 반드시 포함
+   - 근거(evidence)의 articleId 필드에 관련 기사 ID 기록
    - 실행 가능한 조언 1-3개
 
 ### 중요 규칙
 - 모든 분석은 제공된 기사 데이터에 기반해야 함
 - 추측보다는 기사 내용에서 도출된 인사이트 중심
-- 기사 ID를 활용해 근거 제시 (예: articleId: 15)
 - 투자 조언이 아닌 정보 분석임을 명시
+
+### 텍스트 포맷 규칙 (중요!)
+- 마크다운 문법 사용 금지 (**, *, #, - 등의 서식 문자 사용하지 않음)
+- 텍스트 내에 기사 참조 삽입 금지 (예: "(articleId: 15)", "[기사 6190]" 등 사용하지 않음)
+- 기사 참조는 반드시 evidence.articleId, relatedArticleIds 등 지정된 필드에만 기록
+- 모든 텍스트는 순수한 일반 텍스트로 작성
 
 ### 응답 형식
 - 모든 필드를 빠짐없이 채워주세요
@@ -215,8 +220,7 @@ ${formattedArticles}
           { role: "user", content: userPrompt },
         ],
         response_format: zodResponseFormat(DailyReportAIResponseSchema, "daily_report"),
-        temperature: 0.5,
-        max_tokens: 12000,
+        max_completion_tokens: 12000,
       }),
     { retries: 3, delay: 2000 }
   );
