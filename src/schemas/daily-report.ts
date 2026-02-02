@@ -36,7 +36,7 @@ export const ExecutiveSummarySentimentSchema = z.object({
 });
 
 export const ExecutiveSummarySchema = z.object({
-  headline: z.string().min(10).max(60).describe("한줄 헤드라인 (50자 이내)"),
+  headline: z.string().min(10).max(60).describe("클릭 유도하는 헤드라인 (질문형/숫자/개인화 활용, 50자 이내). 예: '내 월급으로 집 살 수 있을까?'"),
   overview: z.string().min(600).describe("종합 요약 (600자 이상). 오늘 경제 뉴스의 핵심을 친근하게 설명"),
   highlights: z.array(HighlightSchema).min(3).max(5).describe("오늘의 하이라이트 3-5개"),
   sentiment: ExecutiveSummarySentimentSchema,
@@ -104,7 +104,7 @@ export const ReportSentimentAnalysisSchema = z.object({
 // ============================================
 
 export const DailyReportAIResponseSchema = z.object({
-  title: z.string().min(10).describe("리포트 제목 (예: 2024년 1월 21일 경제 브리핑)"),
+  title: z.string().min(10).describe("자극적인 리포트 제목 (질문형, 숫자 활용, 감정 단어 포함). 예: '코스피 5000 간다? 전문가들 의견 갈려'"),
   executiveSummary: ExecutiveSummarySchema,
   marketOverview: MarketOverviewSchema,
   keyInsights: z.array(KeyInsightSchema).min(2).max(5).describe("핵심 인사이트 2-5개"),
