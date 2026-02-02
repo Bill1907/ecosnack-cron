@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { config } from "@/config/index.ts";
@@ -26,21 +25,7 @@ import {
   evaluateReportQuality,
   calculateFinalQualityScore,
 } from "@/services/quality-evaluator.ts";
-
-// ============================================
-// OpenAI 클라이언트
-// ============================================
-
-let openaiClient: OpenAI | null = null;
-
-function getOpenAIClient(): OpenAI {
-  if (!openaiClient) {
-    openaiClient = new OpenAI({
-      apiKey: config.openai.apiKey,
-    });
-  }
-  return openaiClient;
-}
+import { getOpenAIClient } from "@/services/openai-client.ts";
 
 // ============================================
 // 시스템 프롬프트

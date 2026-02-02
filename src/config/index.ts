@@ -14,6 +14,10 @@ export const config = {
     qualityFilterLimit: 20, // Stage 2: 30 -> 20
   },
   timezone: process.env.TZ ?? "Asia/Seoul",
+  report: {
+    skipQualityEval: process.env.SKIP_QUALITY_EVAL === "true",
+    skipEvidenceCheck: process.env.SKIP_EVIDENCE_CHECK === "true",
+  },
 } as const;
 
 // 필수 환경 변수 검증

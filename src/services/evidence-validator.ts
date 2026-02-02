@@ -1,6 +1,4 @@
-import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { config } from "@/config/index.ts";
 import {
   EvidenceValidationSchema,
   EvidenceRelevanceAIResponseSchema,
@@ -10,19 +8,9 @@ import {
 import type { DailyReportData, EvidenceItem } from "@/types/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
 import { log, withRetry } from "@/utils/index.ts";
+import { getOpenAIClient } from "@/services/openai-client.ts";
 
-// ============================================
-// OpenAI 클라이언트
-// ============================================
-
-let openaiClient: OpenAI | null = null;
-
-function getOpenAIClient(): OpenAI {
-  if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
-  }
-  return openaiClient;
-}
+const BATCH_SIZE = 5; // 병렬 처리 배치 크기
 
 // ============================================
 // 근거 검증 인터페이스
@@ -139,8 +127,11 @@ export async function validateEvidence(
   let validCount = 0;
   let invalidCount = 0;
 
+  // AI 검증이 필요한 항목 분리
+  type PendingValidation = { evidence: EvidenceItem; article: NewsRecord };
+  const pendingAIValidations: PendingValidation[] = [];
+
   for (const evidence of evidences) {
-    // 1단계: 기사 ID 존재 여부 검증 (로컬)
     const idValidation = validateArticleIdExists(evidence.articleId, articleIds);
 
     if (!idValidation.isValid) {
@@ -155,53 +146,70 @@ export async function validateEvidence(
       continue;
     }
 
-    // 2단계: 관련성 검증 (AI 기반, 선택적)
     if (checkRelevance && evidence.articleId) {
       const article = articlesMap.get(evidence.articleId);
       if (article) {
+        pendingAIValidations.push({ evidence, article });
+        continue;
+      }
+    }
+
+    // 관련성 검증 스킵
+    validCount++;
+    validationResults.push({
+      evidenceText: evidence.text,
+      articleId: evidence.articleId ?? null,
+      isValid: true,
+      reason: idValidation.reason,
+    });
+  }
+
+  // AI 검증 병렬 처리 (BATCH_SIZE 단위)
+  for (let i = 0; i < pendingAIValidations.length; i += BATCH_SIZE) {
+    const batch = pendingAIValidations.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async ({ evidence, article }) => {
         try {
           const relevance = await checkEvidenceRelevance(evidence.text, article);
-
-          if (relevance.relevanceScore >= relevanceThreshold) {
-            validCount++;
-            validationResults.push({
-              evidenceText: evidence.text,
-              articleId: evidence.articleId,
-              isValid: true,
-              reason: relevance.reasoning,
-              relevanceScore: relevance.relevanceScore,
-            });
-          } else {
-            invalidCount++;
-            validationResults.push({
-              evidenceText: evidence.text,
-              articleId: evidence.articleId,
-              isValid: false,
-              reason: `관련성 점수 미달 (${relevance.relevanceScore}/10): ${relevance.reasoning}`,
-              relevanceScore: relevance.relevanceScore,
-            });
-            log(`[낮은 관련성] "${evidence.text.slice(0, 30)}..." - 점수: ${relevance.relevanceScore}`, "warn");
-          }
+          return { evidence, relevance, error: null };
         } catch (error) {
-          // AI 검증 실패 시 로컬 검증만 적용
-          validCount++;
-          validationResults.push({
-            evidenceText: evidence.text,
-            articleId: evidence.articleId,
-            isValid: true,
-            reason: "AI 관련성 검증 실패, 기사 ID 유효성만 확인됨",
-          });
+          return { evidence, relevance: null, error };
         }
+      })
+    );
+
+    for (const { evidence, relevance, error } of results) {
+      if (error || !relevance) {
+        validCount++;
+        validationResults.push({
+          evidenceText: evidence.text,
+          articleId: evidence.articleId!,
+          isValid: true,
+          reason: "AI 관련성 검증 실패, 기사 ID 유효성만 확인됨",
+        });
+        continue;
       }
-    } else {
-      // 관련성 검증 스킵
-      validCount++;
-      validationResults.push({
-        evidenceText: evidence.text,
-        articleId: evidence.articleId ?? null,
-        isValid: true,
-        reason: idValidation.reason,
-      });
+
+      if (relevance.relevanceScore >= relevanceThreshold) {
+        validCount++;
+        validationResults.push({
+          evidenceText: evidence.text,
+          articleId: evidence.articleId!,
+          isValid: true,
+          reason: relevance.reasoning,
+          relevanceScore: relevance.relevanceScore,
+        });
+      } else {
+        invalidCount++;
+        validationResults.push({
+          evidenceText: evidence.text,
+          articleId: evidence.articleId!,
+          isValid: false,
+          reason: `관련성 점수 미달 (${relevance.relevanceScore}/10): ${relevance.reasoning}`,
+          relevanceScore: relevance.relevanceScore,
+        });
+        log(`[낮은 관련성] "${evidence.text.slice(0, 30)}..." - 점수: ${relevance.relevanceScore}`, "warn");
+      }
     }
   }
 

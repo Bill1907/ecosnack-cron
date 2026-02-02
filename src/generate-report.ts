@@ -1,4 +1,4 @@
-import { validateConfig } from "@/config/index.ts";
+import { validateConfig, config } from "@/config/index.ts";
 import { initDatabase, closeDatabase } from "@/services/database.ts";
 import { generateDailyReport } from "@/services/daily-report.ts";
 import { log, getKSTDate, getErrorMessage } from "@/utils/index.ts";
@@ -16,8 +16,11 @@ async function main(): Promise<void> {
     // 2. 데이터베이스 초기화
     initDatabase();
 
-    // 3. 데일리 리포트 생성
-    const result = await generateDailyReport();
+    // 3. 데일리 리포트 생성 (환경 변수 기반 옵션)
+    const result = await generateDailyReport(undefined, {
+      skipQualityEvaluation: config.report.skipQualityEval,
+      skipEvidenceRelevanceCheck: config.report.skipEvidenceCheck,
+    });
 
     if (result.success) {
       log(`리포트 생성 완료 (ID: ${result.reportId}, 기사 수: ${result.articleCount})`);

@@ -51,6 +51,7 @@ export function getErrorMessage(error: unknown): string {
 export interface RetryOptions {
   retries?: number;
   delay?: number;
+  maxDelay?: number; // 백오프 상한
   onRetry?: (error: Error, attempt: number) => void;
 }
 
@@ -59,7 +60,7 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {}
 ): Promise<T> {
-  const { retries = 3, delay = 1000, onRetry } = options;
+  const { retries = 3, delay = 1000, maxDelay = 5000, onRetry } = options;
 
   let lastError: Error = new Error("Retry failed");
 
@@ -71,7 +72,7 @@ export async function withRetry<T>(
 
       if (attempt === retries) break;
 
-      const backoffDelay = delay * Math.pow(2, attempt);
+      const backoffDelay = Math.min(delay * Math.pow(2, attempt), maxDelay);
       onRetry?.(lastError, attempt + 1);
       log(`재시도 ${attempt + 1}/${retries} - ${backoffDelay}ms 후 재시도...`, "warn");
       await new Promise((r) => setTimeout(r, backoffDelay));
