@@ -227,7 +227,7 @@ ${formattedArticles}
         response_format: zodResponseFormat(DailyReportAIResponseSchema, "daily_report"),
         max_completion_tokens: 12000,
       }),
-    { retries: 3, delay: 2000 }
+    { retries: 2, delay: 3000, maxDelay: 10000 }
   );
 
   const content = response.choices[0]?.message?.content;
@@ -406,6 +406,7 @@ export async function generateDailyReport(
 
   try {
     // 1. 해당 날짜의 기사 조회
+    log("DB에서 기사 조회 중...");
     const articles = await getDailyArticles(date);
     log(`${articles.length}개 기사 조회됨`);
 
@@ -425,35 +426,47 @@ export async function generateDailyReport(
       };
     }
 
-    // 2. AI 분석
+    // 2. AI 분석 (타임아웃: 3분)
     log("AI 분석 시작...");
-    const aiResponse = await analyzeForDailyReport(articles);
+    const aiResponse = await Promise.race([
+      analyzeForDailyReport(articles),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("AI 분석 타임아웃 (180초)")), 180_000)
+      ),
+    ]);
     log("AI 분석 완료");
 
     // 3. 데이터 변환
     const reportData = transformAIResponseToReportData(aiResponse, articles, date);
 
-    // 4. 품질 평가 (선택적)
+    // 4. 품질 평가 (선택적, 타임아웃: 90초)
     if (!skipQualityEvaluation) {
       try {
-        // 4-1. 근거 검증
-        log("근거 검증 시작...");
-        const evidenceValidation = await validateEvidence(reportData, articles, {
-          checkRelevance: !skipEvidenceRelevanceCheck,
-        });
-        reportData.evidenceValidation = evidenceValidation;
+        await Promise.race([
+          (async () => {
+            // 4-1. 근거 검증
+            log("근거 검증 시작...");
+            const evidenceValidation = await validateEvidence(reportData, articles, {
+              checkRelevance: !skipEvidenceRelevanceCheck,
+            });
+            reportData.evidenceValidation = evidenceValidation;
 
-        // 4-2. AI 품질 평가
-        log("AI 품질 평가 시작...");
-        const qualityEvaluation = await evaluateReportQuality(reportData);
-        reportData.qualityEvaluation = qualityEvaluation;
+            // 4-2. AI 품질 평가
+            log("AI 품질 평가 시작...");
+            const qualityEvaluation = await evaluateReportQuality(reportData);
+            reportData.qualityEvaluation = qualityEvaluation;
 
-        // 4-3. 종합 점수 계산
-        const evidenceScore = calculateEvidenceScore(evidenceValidation);
-        const finalScore = calculateFinalQualityScore(qualityEvaluation, evidenceScore);
-        reportData.qualityScore = finalScore;
+            // 4-3. 종합 점수 계산
+            const evidenceScore = calculateEvidenceScore(evidenceValidation);
+            const finalScore = calculateFinalQualityScore(qualityEvaluation, evidenceScore);
+            reportData.qualityScore = finalScore;
 
-        log(`품질 평가 완료 - 종합 점수: ${finalScore}/100 (AI: ${qualityEvaluation.overallScore}, 근거: ${evidenceScore})`);
+            log(`품질 평가 완료 - 종합 점수: ${finalScore}/100 (AI: ${qualityEvaluation.overallScore}, 근거: ${evidenceScore})`);
+          })(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("품질 평가 타임아웃 (90초)")), 90_000)
+          ),
+        ]);
       } catch (evalError) {
         log(`품질 평가 중 오류 발생 (리포트 저장은 계속): ${getErrorMessage(evalError)}`, "warn");
       }
@@ -462,6 +475,7 @@ export async function generateDailyReport(
     }
 
     // 5. DB 저장
+    log("DB 저장 시작...");
     const savedReport = await saveDailyReport(reportData);
     log(`데일리 리포트 저장 완료 (ID: ${savedReport.id})`);
 

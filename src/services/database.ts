@@ -14,11 +14,19 @@ import { log, getErrorMessage } from "@/utils/index.ts";
 
 let prisma: PrismaClient | null = null;
 
+// 연결 문자열에 connect_timeout 파라미터 추가 (없는 경우)
+function appendConnectTimeout(url: string, timeoutSec: number): string {
+  const separator = url.includes("?") ? "&" : "?";
+  if (url.includes("connect_timeout")) return url;
+  return `${url}${separator}connect_timeout=${timeoutSec}`;
+}
+
 // Prisma 클라이언트 초기화
 export function initDatabase(): PrismaClient {
   if (!prisma) {
-    // Prisma 7: PrismaNeon에 직접 connectionString 전달
-    const adapter = new PrismaNeon({ connectionString: config.database.url });
+    // Prisma 7: PrismaNeon에 직접 connectionString 전달 (connect_timeout 30초)
+    const connectionString = appendConnectTimeout(config.database.url, 30);
+    const adapter = new PrismaNeon({ connectionString });
     prisma = new PrismaClient({ adapter });
     log("데이터베이스 연결 초기화 완료");
   }

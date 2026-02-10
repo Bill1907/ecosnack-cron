@@ -53,6 +53,20 @@ export interface RetryOptions {
   delay?: number;
   maxDelay?: number; // 백오프 상한
   onRetry?: (error: Error, attempt: number) => void;
+  shouldRetry?: (error: Error) => boolean; // false 반환 시 즉시 실패
+}
+
+// 재시도 불가능한 에러인지 판별 (OpenAI 429 할당량 초과, 401 인증 실패 등)
+function isNonRetryableError(error: Error): boolean {
+  const message = error.message;
+  // OpenAI 429 할당량 초과 (rate limit과 구분)
+  if (message.includes("exceeded your current quota")) return true;
+  if (message.includes("insufficient_quota")) return true;
+  // 인증 실패
+  if (message.includes("401") && message.includes("Incorrect API key")) return true;
+  // 잘못된 요청 (재시도해도 동일)
+  if (message.startsWith("400")) return true;
+  return false;
 }
 
 // 지수 백오프를 적용한 재시도 유틸리티
@@ -60,7 +74,7 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {}
 ): Promise<T> {
-  const { retries = 3, delay = 1000, maxDelay = 5000, onRetry } = options;
+  const { retries = 3, delay = 1000, maxDelay = 5000, onRetry, shouldRetry } = options;
 
   let lastError: Error = new Error("Retry failed");
 
@@ -69,6 +83,17 @@ export async function withRetry<T>(
       return await fn();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      // 재시도 불가능한 에러는 즉시 실패
+      if (isNonRetryableError(lastError)) {
+        log(`재시도 불가능한 에러 - 즉시 실패: ${lastError.message}`, "error");
+        throw lastError;
+      }
+
+      if (shouldRetry && !shouldRetry(lastError)) {
+        log(`shouldRetry가 false 반환 - 즉시 실패: ${lastError.message}`, "error");
+        throw lastError;
+      }
 
       if (attempt === retries) break;
 
