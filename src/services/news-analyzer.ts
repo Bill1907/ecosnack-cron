@@ -101,6 +101,7 @@ const DETAILED_ANALYSIS_SYSTEM_PROMPT = `You are an expert economic analyst. Ana
 
 ## Instructions
 - 한국어 기사는 한국어로, 영어 기사는 영어로 분석
+- 한국어 분석 시 일본어(なお, ご了承, また 등), 중국어 등 다른 언어 절대 혼용 금지. 반드시 한국어만 사용
 - 추측보다는 기사 내용에 기반한 분석
 - 투자 조언이 아닌 정보 분석임을 명시
 - importance_score는 1-10 사이 정수
