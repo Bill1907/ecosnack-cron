@@ -8,6 +8,7 @@
     "start": "bun run src/index.ts",
     "cron": "bun run src/index.ts",
     "report": "bun run src/generate-report.ts",
+    "report:personal": "bun run src/generate-personalized-report.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "db:generate": "bunx prisma generate",
