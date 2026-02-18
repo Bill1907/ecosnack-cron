@@ -86,3 +86,12 @@ export type {
   TitleFilterResponse,
   QualityFilterResponse,
 } from "@/schemas/news-analysis.ts";
+
+// User preferences
+export type {
+  CategoryWeight,
+  UserPreferences,
+  PreferenceUpdateResult,
+  EligibleUser,
+  ScoredArticle,
+} from "@/types/user-preferences.ts";

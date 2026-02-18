@@ -39,6 +39,8 @@ model Article {
   // 시스템
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
+  bookmarks Bookmark[]
+
   @@index([isExemplar])
   @@index([category])
   @@index([qualityRating])
@@ -75,4 +77,85 @@ model DailyReport {
 
   @@index([reportDate(sort: Desc)])
   @@map("daily_reports")
+}
+
+model User {
+  clerkId   String   @id @map("clerk_id") @db.VarChar(255)
+  email     String?  @db.VarChar(255)
+  name      String?  @db.VarChar(255)
+  imageUrl  String?  @map("image_url") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  bookmarks              Bookmark[]
+  preference             UserPreference?
+  personalizedReports    PersonalizedDailyReport[]
+
+  @@map("users")
+}
+
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id") @db.VarChar(255)
+  articleId Int      @map("article_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId])
+  @@index([articleId])
+  @@map("bookmarks")
+}
+
+model UserPreference {
+  id              Int      @id @default(autoincrement())
+  userId          String   @unique @map("user_id") @db.VarChar(255)
+
+  // 선호도 데이터
+  topCategories   Json     @map("top_categories") @db.JsonB  // [{category, weight}]
+  topKeywords     String[] @map("top_keywords")
+  preferredSources String[] @map("preferred_sources")
+  sentimentBias   String?  @map("sentiment_bias") @db.VarChar(20)  // positive/negative/neutral/mixed
+
+  // 메타데이터
+  bookmarkCount   Int      @default(0) @map("bookmark_count")
+  lastBookmarkId  Int?     @map("last_bookmark_id")
+  analyzedAt      DateTime? @map("analyzed_at") @db.Timestamptz
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_preferences")
+}
+
+model PersonalizedDailyReport {
+  id              Int      @id @default(autoincrement())
+  userId          String   @map("user_id") @db.VarChar(255)
+  reportDate      DateTime @map("report_date") @db.Date
+  title           String   @db.Text
+
+  // 리포트 콘텐츠 (기존과 동일 구조)
+  executiveSummary  Json   @map("executive_summary") @db.JsonB
+  marketOverview    Json   @map("market_overview") @db.JsonB
+  keyInsights       Json   @map("key_insights") @db.JsonB
+
+  // 메타데이터
+  topKeywords       String[] @map("top_keywords")
+  sentimentAnalysis Json   @map("sentiment_analysis") @db.JsonB
+  articleCount      Int    @map("article_count")
+  articleIds        Int[]  @map("article_ids")
+  preferenceSnapshot Json? @map("preference_snapshot") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [clerkId], onDelete: Cascade)
+
+  @@unique([userId, reportDate])
+  @@index([userId])
+  @@index([reportDate(sort: Desc)])
+  @@map("personalized_daily_reports")
 }
