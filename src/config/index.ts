@@ -9,7 +9,7 @@ export const config = {
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY ?? "",
-    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+    model: process.env.OPENAI_MODEL ?? "gpt-5-mini",
     titleFilterLimit: 30, // Stage 1: 250 -> 30
     qualityFilterLimit: 20, // Stage 2: 30 -> 20
   },

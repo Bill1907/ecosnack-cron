@@ -42,6 +42,8 @@ async function main(): Promise<void> {
   } finally {
     await closeDatabase();
   }
+
+  process.exit(0);
 }
 
 main();

@@ -1,3 +1,19 @@
+// 메타 코멘트 제거 (프롬프트 누수 방지)
+export function sanitizeMetaComments(text: string): string {
+  const patterns = [
+    /\d+자\s*(이상|이내|이하|내외)[\w]*으로\s*(작성|기술|서술)[\w]*/g,
+    /\d+자\s*(이상|이내|이하|내외)입니다\.?/g,
+    /글자\s*수[를은는이]\s*[^\s.]+/g,
+    /분량[을를]\s*(맞추|충족|채우|맞췄|채웠)[^\s.]*/g,
+  ];
+
+  let result = text;
+  for (const pattern of patterns) {
+    result = result.replace(pattern, "");
+  }
+  return result.replace(/\n{3,}/g, "\n\n").replace(/ {2,}/g, " ").trim();
+}
+
 // pubDate 기반 최신성 점수 계산 (0-20점)
 export function calculateRecencyScore(pubDate?: Date | null): number {
   if (!pubDate) return 0;
@@ -80,4 +96,25 @@ export async function withRetry<T>(
   }
 
   throw lastError;
+}
+
+// 프로미스 타임아웃 래퍼
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message?: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error(message ?? `Timeout after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
 }

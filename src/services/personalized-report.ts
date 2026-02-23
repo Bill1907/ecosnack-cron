@@ -23,7 +23,7 @@ import type {
   EvidenceItem,
 } from "@/types/daily-report.ts";
 import { buildArticleUrl } from "@/types/daily-report.ts";
-import { log, getErrorMessage, withRetry, getKSTDate } from "@/utils/index.ts";
+import { log, getErrorMessage, withRetry, withTimeout, getKSTDate } from "@/utils/index.ts";
 
 // ============================================
 // 개인화 시스템 프롬프트
@@ -206,18 +206,23 @@ ${formattedArticles}
 2. 사용자 관심 분야(${preferences.topCategories.map((c) => c.category).join(", ")})를 중점적으로 다뤄주세요
 3. 최소 글자수 요구사항을 충족해주세요`;
 
-  const response = await withRetry(
-    () =>
-      client.chat.completions.create({
-        model: config.openai.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: zodResponseFormat(DailyReportAIResponseSchema, "personalized_report"),
-        max_completion_tokens: 12000,
-      }),
-    { retries: 3, delay: 2000 }
+  const PERSONALIZED_REPORT_TIMEOUT = 300_000; // 5분
+  const response = await withTimeout(
+    withRetry(
+      () =>
+        client.chat.completions.create({
+          model: config.openai.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: zodResponseFormat(DailyReportAIResponseSchema, "personalized_report"),
+          max_completion_tokens: 12000,
+        }),
+      { retries: 3, delay: 2000 }
+    ),
+    PERSONALIZED_REPORT_TIMEOUT,
+    "개인화 리포트 AI 분석 타임아웃 (5분)"
   );
 
   const content = response.choices[0]?.message?.content;

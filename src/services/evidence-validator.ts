@@ -7,7 +7,8 @@ import {
 } from "@/schemas/quality-evaluation.ts";
 import type { DailyReportData, EvidenceItem } from "@/types/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
-import { log, withRetry } from "@/utils/index.ts";
+import { config } from "@/config/index.ts";
+import { log, withRetry, withTimeout } from "@/utils/index.ts";
 import { getOpenAIClient } from "@/services/openai-client.ts";
 
 const BATCH_SIZE = 5; // 병렬 처리 배치 크기
@@ -86,7 +87,7 @@ Evidence가 해당 기사의 내용에 기반한 것인지 평가해주세요.`;
   const response = await withRetry(
     () =>
       client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: config.openai.model,
         messages: [
           { role: "system", content: "당신은 근거 검증 전문가입니다. 객관적으로 평가해주세요." },
           { role: "user", content: prompt },
@@ -165,12 +166,17 @@ export async function validateEvidence(
   }
 
   // AI 검증 병렬 처리 (BATCH_SIZE 단위)
+  const EVIDENCE_CHECK_TIMEOUT = 30_000; // 30초
   for (let i = 0; i < pendingAIValidations.length; i += BATCH_SIZE) {
     const batch = pendingAIValidations.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(
       batch.map(async ({ evidence, article }) => {
         try {
-          const relevance = await checkEvidenceRelevance(evidence.text, article);
+          const relevance = await withTimeout(
+            checkEvidenceRelevance(evidence.text, article),
+            EVIDENCE_CHECK_TIMEOUT,
+            `근거 관련성 검증 타임아웃: ${evidence.text.slice(0, 30)}`
+          );
           return { evidence, relevance, error: null };
         } catch (error) {
           return { evidence, relevance: null, error };

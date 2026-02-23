@@ -19,25 +19,10 @@ import type {
   TitleFilterResponse,
   QualityFilterResponse,
 } from "@/types/index.ts";
-import { log, getErrorMessage, withRetry } from "@/utils/index.ts";
+import { log, getErrorMessage, withRetry, withTimeout } from "@/utils/index.ts";
 import { buildAnalysisPrompt } from "@/services/prompt-builder.ts";
 import { getExistingLinks } from "@/services/database.ts";
-
-// ============================================
-// OpenAI 클라이언트 (싱글톤)
-// ============================================
-
-let openaiClient: OpenAI | null = null;
-
-function getOpenAIClient(): OpenAI {
-  if (!openaiClient) {
-    openaiClient = new OpenAI({
-      apiKey: config.openai.apiKey,
-    });
-    log("OpenAI 클라이언트 초기화 완료");
-  }
-  return openaiClient;
-}
+import { getOpenAIClient } from "@/services/openai-client.ts";
 
 // ============================================
 // OpenAI 프롬프트 - 필터링용
@@ -515,20 +500,35 @@ async function analyzeArticlesInParallel(
 ): Promise<AnalyzedNewsArticle[]> {
   log(`Stage 3: ${articles.length}개 기사 상세 분석 시작 (병렬 처리)...`);
 
+  const PER_ARTICLE_TIMEOUT = 180_000; // 3분
   const analysisPromises = articles.map(async (article, index) => {
     log(`[${index + 1}/${articles.length}] 분석 중: ${article.title.substring(0, 40)}...`);
-    const analysis = await analyzeArticleWithAI(article);
+    const analysis = await withTimeout(
+      analyzeArticleWithAI(article),
+      PER_ARTICLE_TIMEOUT,
+      `기사 분석 타임아웃: ${article.title.substring(0, 30)}`
+    );
     return { article, analysis };
   });
 
-  const results = await Promise.all(analysisPromises);
+  const settled = await Promise.allSettled(analysisPromises);
 
-  // 분석 성공한 기사만 필터링 (분석 실패 시 저장하지 않음)
-  const analyzedArticles: AnalyzedNewsArticle[] = results
-    .filter((result): result is { article: QualityFilteredArticle; analysis: NewsAnalysisResult } =>
-      result.analysis !== null
-    )
-    .map(({ article, analysis }) => ({
+  // 분석 성공한 기사만 필터링 (타임아웃/실패 시 스킵)
+  const analyzedArticles: AnalyzedNewsArticle[] = [];
+  let failCount = 0;
+
+  for (const result of settled) {
+    if (result.status === "rejected") {
+      failCount++;
+      log(`기사 분석 실패 (스킵): ${result.reason}`, "warn");
+      continue;
+    }
+    const { article, analysis } = result.value;
+    if (!analysis) {
+      failCount++;
+      continue;
+    }
+    analyzedArticles.push({
       title: article.title,
       link: article.link,
       description: article.description,
@@ -544,10 +544,10 @@ async function analyzeArticlesInParallel(
       category: analysis.category,
       sentiment: analysis.sentiment,
       importanceScore: analysis.importance_score,
-    }));
+    });
+  }
 
-  const successCount = results.filter((r) => r.analysis !== null).length;
-  log(`Stage 3 완료: ${successCount}/${articles.length}개 상세 분석 성공`);
+  log(`Stage 3 완료: ${analyzedArticles.length}/${articles.length}개 상세 분석 성공${failCount > 0 ? ` (${failCount}개 실패/타임아웃)` : ""}`);
 
   return analyzedArticles;
 }
