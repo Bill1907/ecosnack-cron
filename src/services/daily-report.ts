@@ -16,7 +16,7 @@ import {
   buildArticleUrl,
 } from "@/types/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
-import { log, getErrorMessage, withRetry, getKSTDate, sanitizeMetaComments } from "@/utils/index.ts";
+import { log, getErrorMessage, withRetry, withTimeout, getKSTDate, sanitizeMetaComments } from "@/utils/index.ts";
 import {
   validateEvidence,
   calculateEvidenceScore,
@@ -274,18 +274,23 @@ ${formattedArticles}
 4. 텍스트 필드에 "기사 N", "id=N", "#N" 같은 기사 참조를 절대 삽입하지 마세요. 기사 ID는 지정된 JSON 필드에만 기록하세요
 5. 모든 텍스트는 반드시 한국어만 사용하세요 (일본어, 중국어 등 혼용 금지)`;
 
-  const response = await withRetry(
-    () =>
-      client.chat.completions.create({
-        model: config.openai.model,
-        messages: [
-          { role: "system", content: DAILY_REPORT_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: zodResponseFormat(DailyReportAIResponseSchema, "daily_report"),
-        max_completion_tokens: 12000,
-      }),
-    { retries: 3, delay: 2000 }
+  const REPORT_GENERATION_TIMEOUT = 300_000; // 5분
+  const response = await withTimeout(
+    withRetry(
+      () =>
+        client.chat.completions.create({
+          model: config.openai.model,
+          messages: [
+            { role: "system", content: DAILY_REPORT_SYSTEM_PROMPT },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: zodResponseFormat(DailyReportAIResponseSchema, "daily_report"),
+          max_completion_tokens: 12000,
+        }),
+      { retries: 3, delay: 2000 }
+    ),
+    REPORT_GENERATION_TIMEOUT,
+    "데일리 리포트 AI 분석 타임아웃 (5분)"
   );
 
   const content = response.choices[0]?.message?.content;

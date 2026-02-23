@@ -10,7 +10,7 @@ import type {
   Sentiment,
   Category,
 } from "@/types/index.ts";
-import { log, getErrorMessage } from "@/utils/index.ts";
+import { log, getErrorMessage, withTimeout } from "@/utils/index.ts";
 
 let prisma: PrismaClient | null = null;
 
@@ -28,7 +28,11 @@ export function initDatabase(): PrismaClient {
 // DB 연결 종료
 export async function closeDatabase(): Promise<void> {
   if (prisma) {
-    await prisma.$disconnect();
+    try {
+      await withTimeout(prisma.$disconnect(), 5000, "DB disconnect timeout");
+    } catch (error) {
+      log(`DB 연결 종료 중 오류: ${getErrorMessage(error)}`, "warn");
+    }
     prisma = null;
     log("데이터베이스 연결 종료");
   }

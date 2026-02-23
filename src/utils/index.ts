@@ -97,3 +97,24 @@ export async function withRetry<T>(
 
   throw lastError;
 }
+
+// 프로미스 타임아웃 래퍼
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message?: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error(message ?? `Timeout after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}

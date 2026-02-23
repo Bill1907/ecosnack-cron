@@ -5,7 +5,7 @@ import {
 } from "@/schemas/quality-evaluation.ts";
 import type { DailyReportData } from "@/types/daily-report.ts";
 import { config } from "@/config/index.ts";
-import { log, withRetry } from "@/utils/index.ts";
+import { log, withRetry, withTimeout } from "@/utils/index.ts";
 import { getOpenAIClient } from "@/services/openai-client.ts";
 
 // ============================================
@@ -115,19 +115,24 @@ ${reportText}
 위 리포트를 6가지 기준(구체성, 근거 기반, 논리적 일관성, 친근한 톤, 실용성, 완결성)으로 평가하고,
 잘된 점과 개선이 필요한 점을 구체적으로 제시해주세요.`;
 
-  const response = await withRetry(
-    () =>
-      client.chat.completions.create({
-        model: config.openai.model,
-        messages: [
-          { role: "system", content: QUALITY_EVALUATION_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: zodResponseFormat(QualityEvaluationAIResponseSchema, "quality_evaluation"),
-        temperature: 0.3,
-        max_tokens: 3000,
-      }),
-    { retries: 2, delay: 1000 }
+  const QUALITY_EVAL_TIMEOUT = 120_000; // 2분
+  const response = await withTimeout(
+    withRetry(
+      () =>
+        client.chat.completions.create({
+          model: config.openai.model,
+          messages: [
+            { role: "system", content: QUALITY_EVALUATION_PROMPT },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: zodResponseFormat(QualityEvaluationAIResponseSchema, "quality_evaluation"),
+          temperature: 0.3,
+          max_tokens: 3000,
+        }),
+      { retries: 2, delay: 1000 }
+    ),
+    QUALITY_EVAL_TIMEOUT,
+    "품질 평가 AI 타임아웃 (2분)"
   );
 
   const content = response.choices[0]?.message?.content;
