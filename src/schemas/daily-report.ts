@@ -26,18 +26,18 @@ export const EvidenceItemSchema = z.object({
 
 export const HighlightSchema = z.object({
   title: z.string().min(5).describe("하이라이트 제목"),
-  description: z.string().min(100).describe("하이라이트 설명 (100자 이상, 친근한 톤)"),
+  description: z.string().min(100).describe("하이라이트 설명 (친근한 톤으로 상세하게)"),
   relatedArticleId: z.number().int().positive().describe("관련 기사 ID"),
 });
 
 export const ExecutiveSummarySentimentSchema = z.object({
   overall: z.enum(["positive", "negative", "neutral", "mixed"]),
-  description: z.string().min(80).describe("시장 분위기 설명 (80자 이상)"),
+  description: z.string().min(80).describe("시장 분위기를 구체적으로 설명"),
 });
 
 export const ExecutiveSummarySchema = z.object({
-  headline: z.string().min(10).max(60).describe("클릭 유도하는 헤드라인 (질문형/숫자/개인화 활용, 50자 이내). 예: '내 월급으로 집 살 수 있을까?'"),
-  overview: z.string().min(600).describe("종합 요약 (600자 이상). 오늘 경제 뉴스의 핵심을 친근하게 설명"),
+  headline: z.string().min(10).max(60).describe("클릭 유도하는 헤드라인 (질문형/숫자/개인화 활용, 간결하게). 예: '내 월급으로 집 살 수 있을까?'"),
+  overview: z.string().min(600).describe("종합 요약. 오늘 경제 뉴스의 핵심을 친근하고 상세하게 설명"),
   highlights: z.array(HighlightSchema).min(3).max(5).describe("오늘의 하이라이트 3-5개"),
   sentiment: ExecutiveSummarySentimentSchema,
 });
@@ -48,15 +48,15 @@ export const ExecutiveSummarySchema = z.object({
 
 export const MarketSectionSchema = z.object({
   title: z.string().min(2).describe("섹션 제목 (예: 국내 증시, 글로벌 금융)"),
-  content: z.string().min(300).describe("상세 분석 (300자 이상)"),
+  content: z.string().min(300).describe("상세 분석 (깊이 있게)"),
   keyData: z.array(z.string()).min(1).describe("핵심 수치/데이터"),
   relatedArticleIds: z.array(z.number().int().positive()).describe("관련 기사 ID 목록"),
 });
 
 export const MarketOverviewSchema = z.object({
-  summary: z.string().min(400).describe("시장 전반 요약 (400자 이상)"),
+  summary: z.string().min(400).describe("시장 전반 요약 (깊이 있게)"),
   sections: z.array(MarketSectionSchema).min(2).max(5).describe("분야별 상세 분석 (2-5개)"),
-  outlook: z.string().min(200).describe("향후 전망 (200자 이상)"),
+  outlook: z.string().min(200).describe("향후 전망 (구체적으로)"),
   watchList: z.array(z.string()).min(2).describe("주목할 이벤트/지표"),
 });
 
@@ -65,9 +65,9 @@ export const MarketOverviewSchema = z.object({
 // ============================================
 
 export const ImplicationsSchema = z.object({
-  investors: z.string().min(100).describe("투자자 영향 (100자 이상)"),
-  workers: z.string().min(100).describe("직장인 영향 (100자 이상)"),
-  consumers: z.string().min(100).describe("소비자 영향 (100자 이상)"),
+  investors: z.string().min(100).describe("투자자 영향 (구체적으로)"),
+  workers: z.string().min(100).describe("직장인 영향 (구체적으로)"),
+  consumers: z.string().min(100).describe("소비자 영향 (구체적으로)"),
 });
 
 export const KeyInsightEvidenceSchema = z.object({
@@ -78,8 +78,8 @@ export const KeyInsightEvidenceSchema = z.object({
 
 export const KeyInsightSchema = z.object({
   title: z.string().min(5).describe("인사이트 제목"),
-  summary: z.string().min(150).describe("요약 (150자 이상)"),
-  analysis: z.string().min(400).describe("심층 분석 (400자 이상)"),
+  summary: z.string().min(150).describe("요약 (핵심을 상세하게)"),
+  analysis: z.string().min(400).describe("심층 분석 (맥락, 원인, 영향을 깊이 있게)"),
   implications: ImplicationsSchema,
   evidence: z.array(KeyInsightEvidenceSchema).min(2).describe("근거 (2개 이상)"),
   relatedArticleIds: z.array(z.number().int().positive()).describe("관련 기사 ID 목록"),

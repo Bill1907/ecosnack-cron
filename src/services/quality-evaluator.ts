@@ -4,6 +4,7 @@ import {
   type QualityEvaluation,
 } from "@/schemas/quality-evaluation.ts";
 import type { DailyReportData } from "@/types/daily-report.ts";
+import { config } from "@/config/index.ts";
 import { log, withRetry } from "@/utils/index.ts";
 import { getOpenAIClient } from "@/services/openai-client.ts";
 
@@ -117,7 +118,7 @@ ${reportText}
   const response = await withRetry(
     () =>
       client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: config.openai.model,
         messages: [
           { role: "system", content: QUALITY_EVALUATION_PROMPT },
           { role: "user", content: userPrompt },

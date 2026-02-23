@@ -16,7 +16,7 @@ import {
   buildArticleUrl,
 } from "@/types/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
-import { log, getErrorMessage, withRetry, getKSTDate } from "@/utils/index.ts";
+import { log, getErrorMessage, withRetry, getKSTDate, sanitizeMetaComments } from "@/utils/index.ts";
 import {
   validateEvidence,
   calculateEvidenceScore,
@@ -57,12 +57,12 @@ const DAILY_REPORT_SYSTEM_PROMPT = `당신은 전문 경제 애널리스트입�
 
 ### 콘텐츠 요구사항
 1. **Executive Summary**
-   - headline: 오늘의 핵심을 50자 이내로
-   - overview: 600자 이상, 오늘 경제 뉴스의 가장 중요한 흐름 설명
+   - headline: 오늘의 핵심을 한 문장으로 간결하게
+   - overview: 오늘 경제 뉴스의 핵심 흐름을 충분히 상세하게 설명 (여러 문단으로 깊이 있게)
    - highlights: 가장 중요한 뉴스 3-5개 선정, 각각 왜 중요한지 설명
 
 2. **Market Overview**
-   - summary: 400자 이상, 시장 전반의 흐름
+   - summary: 시장 전반의 흐름을 깊이 있게 분석 (여러 문단)
    - sections: 2-5개 섹션 (국내 증시, 글로벌 금융, 환율/금리 등)
    - 각 섹션에 구체적 수치 포함 (코스피 +1.2% 등)
 
@@ -90,10 +90,13 @@ const DAILY_REPORT_SYSTEM_PROMPT = `당신은 전문 경제 애널리스트입�
   - 기사를 언급할 때는 기사 제목이나 출처명으로 자연스럽게 서술하세요 (예: "CNBC 보도에 따르면", "삼성전자 실적 관련 기사에서")
 - 기사 ID는 반드시 evidence.articleId, relatedArticleIds 등 지정된 JSON 필드에만 숫자로 기록
 - 모든 텍스트는 순수한 일반 텍스트로 작성 (독자가 읽기 자연스러운 문장)
+- 글자 수, 분량, 길이 등 작성 형식에 대한 메타 코멘트를 본문에 절대 포함하지 마세요
+  - 금지 예시: "400자 이상으로 작성했습니다", "이 섹션은 300자 이내입니다", "충분한 분량으로", "글자수를 맞춰"
+  - 독자에게 보이는 텍스트에는 작성 과정이나 형식 제약에 대한 언급이 없어야 합니다
 
 ### 응답 형식
 - 모든 필드를 빠짐없이 채워주세요
-- 최소 글자수 요구사항을 반드시 충족해야 합니다
+- 각 섹션을 충분히 깊이 있고 상세하게 작성해주세요
 - JSON 형식으로 응답`;
 
 // ============================================
@@ -190,6 +193,57 @@ function formatArticlesForAI(articles: NewsRecord[]): string {
 }
 
 // ============================================
+// 메타 코멘트 제거 (프롬프트 누수 방지)
+// ============================================
+
+function sanitizeAIResponse(
+  response: DailyReportAIResponse
+): DailyReportAIResponse {
+  return {
+    ...response,
+    title: sanitizeMetaComments(response.title),
+    executiveSummary: {
+      ...response.executiveSummary,
+      headline: sanitizeMetaComments(response.executiveSummary.headline),
+      overview: sanitizeMetaComments(response.executiveSummary.overview),
+      highlights: response.executiveSummary.highlights.map((h) => ({
+        ...h,
+        description: sanitizeMetaComments(h.description),
+      })),
+      sentiment: {
+        ...response.executiveSummary.sentiment,
+        description: sanitizeMetaComments(
+          response.executiveSummary.sentiment.description
+        ),
+      },
+    },
+    marketOverview: {
+      ...response.marketOverview,
+      summary: sanitizeMetaComments(response.marketOverview.summary),
+      sections: response.marketOverview.sections.map((s) => ({
+        ...s,
+        content: sanitizeMetaComments(s.content),
+      })),
+      outlook: sanitizeMetaComments(response.marketOverview.outlook),
+    },
+    keyInsights: response.keyInsights.map((insight) => ({
+      ...insight,
+      summary: sanitizeMetaComments(insight.summary),
+      analysis: sanitizeMetaComments(insight.analysis),
+      implications: {
+        investors: sanitizeMetaComments(insight.implications.investors),
+        workers: sanitizeMetaComments(insight.implications.workers),
+        consumers: sanitizeMetaComments(insight.implications.consumers),
+      },
+      evidence: insight.evidence.map((e) => ({
+        ...e,
+        text: sanitizeMetaComments(e.text),
+      })),
+    })),
+  };
+}
+
+// ============================================
 // AI로 데일리 리포트 분석
 // ============================================
 
@@ -216,7 +270,7 @@ ${formattedArticles}
 주의사항:
 1. relatedArticleIds, articleId 필드에는 위 목록에 있는 기사 ID만 사용하세요
 2. 모든 분석에 근거가 되는 기사 ID를 명시해주세요
-3. 최소 글자수 요구사항을 반드시 충족해주세요
+3. 각 섹션을 충분히 깊이 있게 작성해주세요 (짧고 건조한 요약이 아닌 상세한 분석)
 4. 텍스트 필드에 "기사 N", "id=N", "#N" 같은 기사 참조를 절대 삽입하지 마세요. 기사 ID는 지정된 JSON 필드에만 기록하세요
 5. 모든 텍스트는 반드시 한국어만 사용하세요 (일본어, 중국어 등 혼용 금지)`;
 
@@ -240,7 +294,7 @@ ${formattedArticles}
   }
 
   const parsed = DailyReportAIResponseSchema.parse(JSON.parse(content));
-  return parsed;
+  return sanitizeAIResponse(parsed);
 }
 
 // ============================================

@@ -7,6 +7,7 @@ import {
 } from "@/schemas/quality-evaluation.ts";
 import type { DailyReportData, EvidenceItem } from "@/types/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
+import { config } from "@/config/index.ts";
 import { log, withRetry } from "@/utils/index.ts";
 import { getOpenAIClient } from "@/services/openai-client.ts";
 
@@ -86,7 +87,7 @@ Evidence가 해당 기사의 내용에 기반한 것인지 평가해주세요.`;
   const response = await withRetry(
     () =>
       client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: config.openai.model,
         messages: [
           { role: "system", content: "당신은 근거 검증 전문가입니다. 객관적으로 평가해주세요." },
           { role: "user", content: prompt },
