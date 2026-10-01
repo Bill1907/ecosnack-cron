@@ -1,7 +1,4 @@
-import { zodResponseFormat } from "openai/helpers/zod";
 import { Prisma } from "@prisma/client";
-import { z } from "zod";
-import { config } from "@/config/index.ts";
 import { getPrisma } from "@/services/database.ts";
 import { getDailyArticles } from "@/services/daily-report.ts";
 import {
@@ -9,7 +6,8 @@ import {
   updateUserPreference,
   getUserPreference,
 } from "@/services/user-preferences.ts";
-import { getOpenAIClient } from "@/services/openai-client.ts";
+import { createStructured } from "@/services/openai-client.ts";
+import { sanitizeReportText } from "@/services/report-sanitizer.ts";
 import { DailyReportAIResponseSchema } from "@/schemas/daily-report.ts";
 import type { DailyReportAIResponse } from "@/schemas/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
@@ -23,7 +21,8 @@ import type {
   EvidenceItem,
 } from "@/types/daily-report.ts";
 import { buildArticleUrl } from "@/types/daily-report.ts";
-import { log, getErrorMessage, withRetry, withTimeout, getKSTDate } from "@/utils/index.ts";
+import { log, getErrorMessage } from "@/utils/index.ts";
+import { toDbDate, fromDbDate } from "@/utils/kst.ts";
 
 // ============================================
 // 개인화 시스템 프롬프트
@@ -70,12 +69,12 @@ function buildPersonalizedSystemPrompt(preferences: UserPreferences): string {
 
 ### 텍스트 포맷 규칙
 - 마크다운 문법 사용 금지
-- 텍스트 내 기사 참조 삽입 금지
+- 텍스트 내 기사 참조 삽입 금지 (예: "기사 7324에 따르면", "〔근거: 25568〕", "id=123"). 기사 ID는 articleId, relatedArticleIds 필드에만
 - 모든 텍스트는 순수한 일반 텍스트로 작성
 
 ### 응답 형식
 - 모든 필드를 빠짐없이 채워주세요
-- 최소 글자수 요구사항을 충족해주세요
+- 글자 수·분량에 대한 메타 코멘트를 본문에 쓰지 마세요
 - JSON 형식으로 응답`;
 }
 
@@ -185,7 +184,6 @@ async function generatePersonalizedAIReport(
   articles: NewsRecord[],
   preferences: UserPreferences
 ): Promise<DailyReportAIResponse> {
-  const client = getOpenAIClient();
   const articleIds = articles.map((a) => a.id);
   const formattedArticles = formatArticlesForAI(articles);
 
@@ -204,33 +202,20 @@ ${formattedArticles}
 주의사항:
 1. relatedArticleIds, articleId 필드에는 위 목록의 기사 ID만 사용
 2. 사용자 관심 분야(${preferences.topCategories.map((c) => c.category).join(", ")})를 중점적으로 다뤄주세요
-3. 최소 글자수 요구사항을 충족해주세요`;
+3. 각 섹션을 충분히 깊이 있게 작성해주세요
+4. 본문 텍스트에 기사 ID나 "〔근거: …〕" 같은 인용 표기를 넣지 마세요`;
 
-  const PERSONALIZED_REPORT_TIMEOUT = 300_000; // 5분
-  const response = await withTimeout(
-    withRetry(
-      () =>
-        client.chat.completions.create({
-          model: config.openai.model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: zodResponseFormat(DailyReportAIResponseSchema, "personalized_report"),
-          max_completion_tokens: 12000,
-        }),
-      { retries: 3, delay: 2000 }
-    ),
-    PERSONALIZED_REPORT_TIMEOUT,
-    "개인화 리포트 AI 분석 타임아웃 (5분)"
-  );
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("Empty response from OpenAI");
-  }
-
-  return DailyReportAIResponseSchema.parse(JSON.parse(content));
+  const parsed = await createStructured({
+    schema: DailyReportAIResponseSchema,
+    name: "personalized_report",
+    system: systemPrompt,
+    user: userPrompt,
+    // 기본 추론은 출력 상한을 먹어 finish_reason=length 로 빈 응답이 난다 (개인화 2/4 실측)
+    reasoningEffort: "low",
+    maxOutputTokens: 32000,
+    timeoutMs: 300_000,
+  });
+  return sanitizeReportText(parsed);
 }
 
 // ============================================
@@ -257,7 +242,7 @@ function buildRelatedArticlesFromIds(
 function transformAIResponseToReportData(
   aiResponse: DailyReportAIResponse,
   articles: NewsRecord[],
-  targetDate: Date
+  date: string
 ): DailyReportData {
   const articlesMap = new Map(articles.map((a) => [a.id, a]));
 
@@ -349,7 +334,7 @@ function transformAIResponseToReportData(
       : "neutral";
 
   return {
-    reportDate: targetDate,
+    reportDate: toDbDate(date),
     title: aiResponse.title,
     executiveSummary,
     marketOverview,
@@ -377,8 +362,8 @@ async function savePersonalizedReport(
 ): Promise<{ id: number; reportDate: Date }> {
   const db = getPrisma();
 
-  const reportDateOnly = new Date(report.reportDate);
-  reportDateOnly.setHours(0, 0, 0, 0);
+  // reportDate 는 toDbDate() 로 만든 UTC 자정 값 (Postgres date)
+  const reportDateOnly = report.reportDate;
 
   const result = await db.personalizedDailyReport.upsert({
     where: {
@@ -435,7 +420,7 @@ export interface GeneratePersonalizedReportResult {
   userId: string;
   success: boolean;
   reportId?: number;
-  reportDate?: Date;
+  reportDate?: string;
   articleCount?: number;
   error?: string;
 }
@@ -446,13 +431,14 @@ export interface GeneratePersonalizedReportResult {
 export async function generatePersonalizedReportForUser(
   user: EligibleUser,
   allArticles: NewsRecord[],
-  targetDate: Date
+  date: string,
+  dryRun = false
 ): Promise<GeneratePersonalizedReportResult> {
   const { userId } = user;
 
   try {
-    // 1. 선호도 업데이트 (증분)
-    await updateUserPreference(userId);
+    // 1. 선호도 업데이트 (증분) — dry-run 에서는 DB를 건드리지 않는다
+    if (!dryRun) await updateUserPreference(userId);
 
     // 2. 최신 선호도 조회
     const preferences = await getUserPreference(userId);
@@ -483,10 +469,14 @@ export async function generatePersonalizedReportForUser(
     const reportData = transformAIResponseToReportData(
       aiResponse,
       filteredArticles,
-      targetDate
+      date
     );
 
     // 6. DB 저장
+    if (dryRun) {
+      log(`사용자 ${userId} 개인화 리포트 dry-run: 저장 생략`);
+      return { userId, success: true, reportDate: date, articleCount: filteredArticles.length };
+    }
     const savedReport = await savePersonalizedReport(userId, reportData, preferences);
 
     log(`사용자 ${userId} 개인화 리포트 저장 완료 (ID: ${savedReport.id})`);
@@ -495,7 +485,7 @@ export async function generatePersonalizedReportForUser(
       userId,
       success: true,
       reportId: savedReport.id,
-      reportDate: savedReport.reportDate,
+      reportDate: fromDbDate(savedReport.reportDate),
       articleCount: filteredArticles.length,
     };
   } catch (error) {
@@ -513,18 +503,20 @@ export async function generatePersonalizedReportForUser(
 /**
  * 모든 대상 사용자 개인화 리포트 생성
  */
+/**
+ * @param date 리포트 기준일 "YYYY-MM-DD" (KST)
+ */
 export async function generateAllPersonalizedReports(
-  targetDate?: Date
+  date: string,
+  options: { dryRun?: boolean } = {}
 ): Promise<{
   total: number;
   success: number;
   failed: number;
   results: GeneratePersonalizedReportResult[];
 }> {
-  const date = targetDate ?? getKSTDate();
-  const dateStr = date.toISOString().split("T")[0];
-
-  log(`=== 개인화 데일리 리포트 생성 시작 (${dateStr}) ===`);
+  const dryRun = options.dryRun ?? false;
+  log(`=== 개인화 데일리 리포트 생성 시작 (${date}${dryRun ? ", dry-run" : ""}) ===`);
 
   // 1. 대상 사용자 조회
   const eligibleUsers = await getEligibleUsers();
@@ -534,22 +526,27 @@ export async function generateAllPersonalizedReports(
     return { total: 0, success: 0, failed: 0, results: [] };
   }
 
-  // 2. 오늘 기사 조회 (전체)
+  // 2. 기준일 기사 조회 (전체)
   const allArticles = await getDailyArticles(date);
-  log(`오늘 기사: ${allArticles.length}개`);
+  log(`${date} 기사: ${allArticles.length}개`);
 
   if (allArticles.length < 3) {
     log("분석할 기사 부족", "warn");
     return { total: eligibleUsers.length, success: 0, failed: eligibleUsers.length, results: [] };
   }
 
-  // 3. 각 사용자별 리포트 생성
-  const results: GeneratePersonalizedReportResult[] = [];
-
-  for (const user of eligibleUsers) {
-    const result = await generatePersonalizedReportForUser(user, allArticles, date);
-    results.push(result);
-  }
+  // 3. 각 사용자별 리포트 생성 (동시 3명 — Workers 크론 15분 한도 안에 끝나도록)
+  const CONCURRENCY = 3;
+  const results: GeneratePersonalizedReportResult[] = new Array(eligibleUsers.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, eligibleUsers.length) }, async () => {
+      while (next < eligibleUsers.length) {
+        const i = next++;
+        results[i] = await generatePersonalizedReportForUser(eligibleUsers[i]!, allArticles, date, dryRun);
+      }
+    })
+  );
 
   const successCount = results.filter((r) => r.success).length;
   const failedCount = results.filter((r) => !r.success).length;

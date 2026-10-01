@@ -144,6 +144,12 @@ function parseRssFeed(xml: string, source: string, region: string): RawNewsArtic
 }
 
 // 단일 소스에서 뉴스 수집
+export const FETCH_OPTIONS = {
+  timeoutMs: 15_000, // 피드 하나가 응답 없이 붙잡아 크론 전체가 멈추는 것을 막는다
+  retries: 3,
+  retryDelayMs: 1000,
+};
+
 async function fetchFromSource(rssSource: RssSource): Promise<RawNewsArticle[]> {
   const { url, source, region } = rssSource;
 
@@ -155,6 +161,7 @@ async function fetchFromSource(rssSource: RssSource): Promise<RawNewsArticle[]> 
             "User-Agent": "Mozilla/5.0 (compatible; EcoSnackBot/1.0)",
             Accept: "application/rss+xml, application/xml, text/xml, */*",
           },
+          signal: AbortSignal.timeout(FETCH_OPTIONS.timeoutMs),
         });
 
         if (!response.ok) {
@@ -163,7 +170,7 @@ async function fetchFromSource(rssSource: RssSource): Promise<RawNewsArticle[]> 
 
         return response.text();
       },
-      { retries: 3, delay: 1000 }
+      { retries: FETCH_OPTIONS.retries, delay: FETCH_OPTIONS.retryDelayMs }
     );
 
     const articles = parseRssFeed(xml, source, region);

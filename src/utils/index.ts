@@ -14,6 +14,22 @@ export function sanitizeMetaComments(text: string): string {
   return result.replace(/\n{3,}/g, "\n\n").replace(/ {2,}/g, " ").trim();
 }
 
+// 본문에 새는 기사 ID 인용 제거: "〔근거: 25568, 25565〕", "[근거: 123]", "(기사 7324)", "id=12" 등
+// 기사 ID 는 evidence.articleId 같은 지정 필드에만 있어야 한다
+const ARTICLE_REF_PATTERNS = [
+  /\s*[〔\[(（【]\s*(?:근거|출처|기사|참고|ref)\s*(?:ID|id)?\s*[:：]?\s*(?:#?\d+\s*[,，、]?\s*)+[〕\])）】]/g,
+  /\s*[〔\[(（【]\s*(?:articleId|id)\s*[:=]\s*\d+(?:\s*,\s*\d+)*\s*[〕\])）】]/g,
+  /\bid=\d+/g,
+];
+
+export function stripArticleRefs(text: string): string {
+  let result = text;
+  for (const pattern of ARTICLE_REF_PATTERNS) {
+    result = result.replace(pattern, "");
+  }
+  return result.replace(/ {2,}/g, " ").replace(/ +([.,!?。])/g, "$1").trim();
+}
+
 // pubDate 기반 최신성 점수 계산 (0-20점)
 export function calculateRecencyScore(pubDate?: Date | null): number {
   if (!pubDate) return 0;
@@ -28,24 +44,9 @@ export function calculateRecencyScore(pubDate?: Date | null): number {
   return 0;
 }
 
-// 한국 시간으로 현재 시각 반환
-export function getKSTDate(): Date {
-  return new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" })
-  );
-}
-
-// 날짜를 ISO 문자열로 변환 (한국 시간 기준)
-export function toKSTISOString(date: Date): string {
-  const kstOffset = 9 * 60; // UTC+9
-  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
-  const kstDate = new Date(utc + kstOffset * 60000);
-  return kstDate.toISOString();
-}
-
-// 로그 출력 (타임스탬프 포함)
+// 로그 출력 (UTC ISO 타임스탬프)
 export function log(message: string, level: "info" | "error" | "warn" = "info"): void {
-  const timestamp = getKSTDate().toISOString();
+  const timestamp = new Date().toISOString();
   const prefix = {
     info: "[INFO]",
     error: "[ERROR]",

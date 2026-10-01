@@ -1,19 +1,18 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach, mock } from "bun:test";
-import { analyzeNews } from "@/services/news-analyzer.ts";
+import { analyzeNews, MIN_STAGE3_SUCCESS_RATE } from "@/services/news-analyzer.ts";
 import * as database from "@/services/database.ts";
+import * as openaiClient from "@/services/openai-client.ts";
+import * as scoring from "@/services/article-scoring.ts";
+import * as promptBuilder from "@/services/prompt-builder.ts";
 import type { RawNewsArticle } from "@/types/index.ts";
+import type { NewsAnalysisResult } from "@/schemas/news-analysis.ts";
 
-// Bun fetch mock 타입 호환성 해결
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockFetch = (impl: () => Promise<any>): typeof fetch =>
-  mock(impl) as unknown as typeof fetch;
+const mockFetch = (impl: (url: string) => Promise<any>): typeof fetch =>
+  mock((input: string | URL | Request) => impl(String(input))) as unknown as typeof fetch;
 
-// ============================================
-// Mock Data
-// ============================================
-
-const createMockArticles = (count: number): RawNewsArticle[] => {
-  return Array.from({ length: count }, (_, i) => ({
+const createMockArticles = (count: number): RawNewsArticle[] =>
+  Array.from({ length: count }, (_, i) => ({
     title: `Test Article ${i + 1}: Economic News About Market ${i + 1}`,
     link: `https://example.com/article-${i + 1}`,
     description: `This is a detailed description for article ${i + 1} about economic developments.`,
@@ -21,749 +20,190 @@ const createMockArticles = (count: number): RawNewsArticle[] => {
     source: i % 2 === 0 ? "CNBC" : "매일경제",
     region: i % 2 === 0 ? "US" : "KR",
   }));
-};
 
-const sampleHtmlWithOgImage = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta property="og:image" content="https://cdn.example.com/image.jpg" />
-  <meta property="og:title" content="Test Article" />
-</head>
-<body>
-  <article>
-    <img src="/article-image.jpg" alt="Article Image" />
-  </article>
-</body>
-</html>
-`;
+const html = (head: string, body = "") => `<!DOCTYPE html><html><head>${head}</head><body>${body}</body></html>`;
+const OG = html('<meta property="og:image" content="https://cdn.example.com/image.jpg" />');
+const TWITTER = html('<meta name="twitter:image" content="https://twitter.example.com/image.png" />');
+const ARTICLE_IMG = html("", '<article><img src="https://example.com/article-img.jpg" /></article>');
+const RELATIVE = html('<meta property="og:image" content="/images/relative.jpg" />');
+const PROTOCOL_RELATIVE = html('<meta property="og:image" content="//cdn.example.com/protocol-relative.jpg" />');
+const NO_IMAGE = html("<title>No Image</title>", "<p>text</p>");
 
-const sampleHtmlWithTwitterImage = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="twitter:image" content="https://twitter.example.com/image.png" />
-</head>
-<body></body>
-</html>
-`;
-
-const sampleHtmlWithArticleImage = `
-<!DOCTYPE html>
-<html>
-<head></head>
-<body>
-  <article>
-    <img src="https://example.com/article-img.jpg" />
-  </article>
-</body>
-</html>
-`;
-
-const sampleHtmlWithRelativeImage = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta property="og:image" content="/images/relative.jpg" />
-</head>
-<body></body>
-</html>
-`;
-
-const sampleHtmlWithProtocolRelativeImage = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta property="og:image" content="//cdn.example.com/protocol-relative.jpg" />
-</head>
-<body></body>
-</html>
-`;
-
-const sampleHtmlNoImage = `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>No Image Article</title>
-</head>
-<body>
-  <p>Article content without any images</p>
-</body>
-</html>
-`;
-
-// ============================================
-// Mock OpenAI Response
-// ============================================
-
-const createMockTitleFilterResponse = (articles: { index: number }[]) => ({
-  articles: articles.map((a, i) => ({
-    index: a.index,
-    score: 90 - i * 2, // 점수 순차 감소
-    reason: `Good economic news article ${a.index}`,
-  })),
+const fakeAnalysis = (n = 7): NewsAnalysisResult => ({
+  headline_summary: "요약 ".repeat(40),
+  so_what: { main_point: "핵심 ".repeat(80), market_signal: "신호 ".repeat(50), time_horizon: "short" },
+  impact_analysis: {
+    investors: { summary: "투자 ".repeat(60), action_items: ["a"], sectors_affected: ["s"] },
+    workers: { summary: "직장 ".repeat(60), industries_affected: ["i"], job_outlook: "고용 ".repeat(30) },
+    consumers: { summary: "소비 ".repeat(60), price_impact: "물가 ".repeat(30), spending_advice: "조언 ".repeat(30) },
+  },
+  related_context: { background: "배경 ".repeat(60), related_events: ["e"], what_to_watch: "주목 ".repeat(40) },
+  keywords: ["금리", "환율", "증시"],
+  category: "markets",
+  sentiment: { overall: "neutral", confidence: 0.7 },
+  importance_score: n,
 });
-
-const createMockQualityFilterResponse = (articles: { index: number }[]) => ({
-  articles: articles.map((a, i) => ({
-    index: a.index,
-    score: 85 - i * 3,
-    reason: `Quality content from trusted source ${a.index}`,
-  })),
-});
-
-// ============================================
-// Tests
-// ============================================
 
 describe("news-analyzer", () => {
-  let consoleSpy: ReturnType<typeof spyOn>;
   let originalFetch: typeof globalThis.fetch;
-  let getExistingLinksSpy: ReturnType<typeof spyOn>;
+  const spies: { mockRestore: () => void }[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let createStructuredSpy: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let headlineSpy: any;
 
   beforeEach(() => {
-    consoleSpy = spyOn(console, "log").mockImplementation(() => {});
+    spies.push(spyOn(console, "log").mockImplementation(() => {}));
     originalFetch = globalThis.fetch;
-    // Mock getExistingLinks to return empty set (no duplicates)
-    getExistingLinksSpy = spyOn(database, "getExistingLinks").mockImplementation(
-      async () => new Set<string>()
+    spies.push(spyOn(database, "getExistingLinks").mockImplementation(async () => new Set<string>()));
+    spies.push(
+      spyOn(promptBuilder, "buildAnalysisPrompt").mockImplementation(
+        async () => ({ system: "s", user: "u" }) as Awaited<ReturnType<typeof promptBuilder.buildAnalysisPrompt>>
+      )
     );
+    headlineSpy = spyOn(scoring, "scoreHeadlines").mockImplementation(async (items) => items.map((_, i) => 100 - i));
+    spies.push(headlineSpy);
+    spies.push(spyOn(scoring, "scoreQuality").mockImplementation(async (items) => items.map(() => 70)));
+    createStructuredSpy = spyOn(openaiClient, "createStructured").mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (async () => fakeAnalysis()) as any
+    );
+    spies.push(createStructuredSpy);
+    globalThis.fetch = mockFetch(() => Promise.resolve(new Response(OG, { status: 200 })));
   });
 
   afterEach(() => {
-    consoleSpy.mockRestore();
     globalThis.fetch = originalFetch;
-    getExistingLinksSpy.mockRestore();
+    while (spies.length) spies.pop()!.mockRestore();
   });
-
-  // ============================================
-  // 기본 동작 테스트
-  // ============================================
 
   describe("기본 동작", () => {
     test("빈 배열 입력시 빈 결과 반환", async () => {
-      const result = await analyzeNews([]);
-
-      expect(result.success).toBe(true);
-      expect(result.articles).toEqual([]);
-      expect(result.error).toBeUndefined();
+      expect(await analyzeNews([])).toEqual({ success: true, articles: [] });
     });
 
-    test("원본 기사 속성 보존", async () => {
-      // 30개 이하면 필터링 스킵
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Original Title",
-          link: "https://example.com/original",
-          description: "Original Description",
-          pubDate: new Date("2024-12-26"),
-          source: "CNBC",
-          region: "US",
-        },
-      ];
-
-      // Mock fetch for image extraction
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(
-          new Response(sampleHtmlWithOgImage, { status: 200 })
-        )
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
+    test("원본 기사 속성 보존 + 분석 필드 채움", async () => {
+      const [a] = createMockArticles(1);
+      const result = await analyzeNews([a!]);
       const analyzed = result.articles[0];
+      expect(result.success).toBe(true);
+      expect(analyzed?.title).toBe(a!.title);
+      expect(analyzed?.link).toBe(a!.link);
+      expect(analyzed?.description).toBe(a!.description);
+      expect(analyzed?.source).toBe(a!.source);
+      expect(analyzed?.region).toBe(a!.region);
+      expect(analyzed?.importanceScore).toBe(7);
+      expect(analyzed?.keywords).toEqual(["금리", "환율", "증시"]);
+      expect(analyzed?.category).toBe("markets");
+    });
 
-      expect(analyzed).toBeDefined();
-      expect(analyzed?.title).toBe("Original Title");
-      expect(analyzed?.link).toBe("https://example.com/original");
-      expect(analyzed?.description).toBe("Original Description");
-      expect(analyzed?.source).toBe("CNBC");
-      expect(analyzed?.region).toBe("US");
+    test("이미 DB에 있는 기사는 분석하지 않는다", async () => {
+      spies.push(spyOn(database, "getExistingLinks").mockImplementation(async (links: string[]) => new Set(links)));
+      const result = await analyzeNews(createMockArticles(3));
+      expect(result).toEqual({ success: true, articles: [] });
+      expect(createStructuredSpy).not.toHaveBeenCalled();
     });
   });
 
-  // ============================================
-  // Stage 1: 제목 필터링 테스트 (30개 이하인 경우)
-  // ============================================
-
-  describe("Stage 1: 제목 필터링 (기사 수 ≤ 30)", () => {
-    test("30개 이하 기사는 필터링 없이 모두 통과", async () => {
-      const articles = createMockArticles(25);
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      // 30개 이하면 Stage 1 스킵, Stage 2에서 20개로 필터링
-      expect(result.success).toBe(true);
-      expect(result.articles.length).toBeLessThanOrEqual(20);
+  describe("Stage 1/2 필터링", () => {
+    test("30개 이하면 제목 점수를 매기지 않는다", async () => {
+      const result = await analyzeNews(createMockArticles(25));
+      expect(headlineSpy).not.toHaveBeenCalled();
+      expect(result.articles.length).toBe(20);
     });
 
-    test("정확히 20개 기사는 모두 통과 가능", async () => {
-      const articles = createMockArticles(20);
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
+    test("50개 → 30개(제목) → 20개(품질)", async () => {
+      const result = await analyzeNews(createMockArticles(50));
+      expect(headlineSpy).toHaveBeenCalledTimes(1);
       expect(result.success).toBe(true);
       expect(result.articles.length).toBe(20);
     });
-  });
 
-  // ============================================
-  // 이미지 추출 테스트
-  // ============================================
+    test("제목 점수 상위 기사가 남는다", async () => {
+      headlineSpy.mockImplementation(async (items: unknown[]) => items.map((_, i) => i)); // 뒤쪽일수록 높게
+      const result = await analyzeNews(createMockArticles(40));
+      const ids = result.articles.map((a) => Number(a.link.split("-").pop()));
+      expect(Math.min(...ids)).toBeGreaterThan(10);
+    });
+
+    test("이미지 있는 기사를 우선 선택", async () => {
+      globalThis.fetch = mockFetch((url) => {
+        const n = Number(url.split("-").pop());
+        return Promise.resolve(new Response(n % 2 === 0 ? OG : NO_IMAGE, { status: 200 }));
+      });
+      const result = await analyzeNews(createMockArticles(25));
+      expect(result.articles.filter((a) => a.imageUrl).length).toBe(12); // 짝수 12개 전부
+      expect(result.articles.length).toBe(20);
+    });
+
+    test("점수 서비스가 실패하면 분석 실패로 끝난다 (조용히 50점 주지 않음)", async () => {
+      headlineSpy.mockImplementation(async () => {
+        throw new Error("Jev, LLM 모두 실패");
+      });
+      const result = await analyzeNews(createMockArticles(40));
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("모두 실패");
+      expect(createStructuredSpy).not.toHaveBeenCalled();
+    });
+  });
 
   describe("이미지 추출", () => {
-    test("og:image 메타 태그에서 이미지 추출", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "OG Image Test",
-          link: "https://example.com/og-test",
-          description: "Testing og:image extraction",
-        },
-      ];
+    const cases: [string, string, string | undefined][] = [
+      ["og:image", OG, "https://cdn.example.com/image.jpg"],
+      ["twitter:image", TWITTER, "https://twitter.example.com/image.png"],
+      ["article img", ARTICLE_IMG, "https://example.com/article-img.jpg"],
+      ["상대 경로", RELATIVE, "https://example.com/images/relative.jpg"],
+      ["프로토콜 상대 경로", PROTOCOL_RELATIVE, "https://cdn.example.com/protocol-relative.jpg"],
+      ["이미지 없음", NO_IMAGE, undefined],
+    ];
+    for (const [name, page, expected] of cases) {
+      test(name, async () => {
+        globalThis.fetch = mockFetch(() => Promise.resolve(new Response(page, { status: 200 })));
+        const result = await analyzeNews([{ title: name, link: "https://example.com/x" }]);
+        expect(result.articles[0]?.imageUrl).toBe(expected);
+      });
+    }
 
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.imageUrl).toBe("https://cdn.example.com/image.jpg");
-    });
-
-    test("twitter:image 메타 태그에서 이미지 추출 (og:image 없을 때)", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Twitter Image Test",
-          link: "https://example.com/twitter-test",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithTwitterImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.imageUrl).toBe("https://twitter.example.com/image.png");
-    });
-
-    test("article 태그 내 이미지 추출 (메타 태그 없을 때)", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Article Image Test",
-          link: "https://example.com/article-img-test",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithArticleImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.imageUrl).toBe("https://example.com/article-img.jpg");
-    });
-
-    test("상대 경로 이미지 URL을 절대 경로로 변환", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Relative Path Test",
-          link: "https://example.com/relative-test",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithRelativeImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.imageUrl).toBe("https://example.com/images/relative.jpg");
-    });
-
-    test("프로토콜 상대 경로 (//) 처리", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Protocol Relative Test",
-          link: "https://example.com/protocol-test",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithProtocolRelativeImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.imageUrl).toBe("https://cdn.example.com/protocol-relative.jpg");
-    });
-
-    test("이미지 없는 페이지 처리", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "No Image Test",
-          link: "https://example.com/no-image",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.imageUrl).toBeUndefined();
-    });
-
-    test("fetch 실패시 이미지 null 반환", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Fetch Fail Test",
-          link: "https://example.com/fetch-fail",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response("", { status: 404 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.imageUrl).toBeUndefined();
-    });
-
-    test("네트워크 오류시 이미지 null 반환", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Network Error Test",
-          link: "https://example.com/network-error",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.reject(new Error("Network error"))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      // 네트워크 오류여도 분석은 계속 진행
+    test("네트워크 오류여도 분석은 계속", async () => {
+      globalThis.fetch = mockFetch(() => Promise.reject(new Error("Network error")));
+      const result = await analyzeNews([{ title: "t", link: "https://example.com/n" }]);
       expect(result.success).toBe(true);
-      const analyzed = result.articles[0];
-      expect(analyzed?.imageUrl).toBeUndefined();
+      expect(result.articles[0]?.imageUrl).toBeUndefined();
     });
   });
 
-  // ============================================
-  // 요약 생성 테스트
-  // ============================================
-
-  describe("요약 생성", () => {
-    test("description이 있으면 요약 생성", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Test Title",
-          link: "https://example.com/test",
-          description: "This is a test description for summarization.",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.headlineSummary).toBeDefined();
-      expect(analyzed?.headlineSummary).toContain("test description");
+  describe("Stage 3 성공률 가드", () => {
+    test(`성공률이 ${MIN_STAGE3_SUCCESS_RATE * 100}% 미만이면 success=false, 성공분은 반환`, async () => {
+      let n = 0;
+      createStructuredSpy.mockImplementation(async () => {
+        n++;
+        if (n % 4 !== 0) throw new Error("400 Unsupported parameter: 'max_tokens'");
+        return fakeAnalysis();
+      });
+      const result = await analyzeNews(createMockArticles(20));
+      expect(result.success).toBe(false);
+      expect(result.articles.length).toBe(5);
+      expect(result.error).toContain("성공률");
     });
 
-    test("description 없으면 title 사용", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Fallback to Title",
-          link: "https://example.com/no-desc",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.headlineSummary).toBe("Fallback to Title");
-    });
-
-    test("HTML 태그 제거", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "HTML Test",
-          link: "https://example.com/html",
-          description: "<p>Paragraph with <strong>bold</strong> text</p>",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.headlineSummary).not.toContain("<p>");
-      expect(analyzed?.headlineSummary).not.toContain("</p>");
-      expect(analyzed?.headlineSummary).not.toContain("<strong>");
-    });
-
-    test("200자 초과시 잘림", async () => {
-      const longDescription = "A".repeat(500);
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Long Article",
-          link: "https://example.com/long",
-          description: longDescription,
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.headlineSummary).toBeDefined();
-      expect(analyzed?.headlineSummary!.length).toBeLessThanOrEqual(203);
-    });
-
-    test("문장 경계에서 자르기", async () => {
-      const description =
-        "This is the first sentence. This is the second sentence that makes the text longer than 200 characters. This third sentence adds even more content.";
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Sentence Boundary",
-          link: "https://example.com/sentence",
-          description,
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      // 문장 경계에서 잘렸다면 마침표로 끝남
-      if (analyzed?.headlineSummary && analyzed.headlineSummary.length < 200) {
-        expect(analyzed.headlineSummary.endsWith(".")).toBe(true);
-      }
-    });
-
-    test("공백 정규화", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Whitespace Test",
-          link: "https://example.com/ws",
-          description: "Multiple   spaces\n\nand\tnewlines",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.headlineSummary).not.toContain("  ");
-      expect(analyzed?.headlineSummary).not.toContain("\n");
-      expect(analyzed?.headlineSummary).not.toContain("\t");
-    });
-  });
-
-  // ============================================
-  // Stage 2: 품질 필터링 테스트
-  // ============================================
-
-  describe("Stage 2: 품질 필터링", () => {
-    test("이미지 있는 기사 우선 선택", async () => {
-      const articles = createMockArticles(15);
-
-      // 홀수 인덱스는 이미지 없음, 짝수는 있음
-      let callCount = 0;
-      globalThis.fetch = mockFetch(() => {
-        const hasImage = callCount % 2 === 0;
-        callCount++;
-        return Promise.resolve(
-          new Response(hasImage ? sampleHtmlWithOgImage : sampleHtmlNoImage, {
-            status: 200,
-          })
-        );
-      }) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      // 이미지 있는 기사가 우선 선택됨
-      const withImages = result.articles.filter((a) => a.imageUrl);
-      expect(withImages.length).toBeGreaterThan(0);
-    });
-
-    test("최대 20개 기사 반환", async () => {
-      const articles = createMockArticles(25);
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      expect(result.articles.length).toBeLessThanOrEqual(20);
-    });
-  });
-
-  // ============================================
-  // 분석 결과 필드 테스트
-  // ============================================
-
-  describe("분석 결과 필드", () => {
-    test("importanceScore 설정", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Score Test",
-          link: "https://example.com/score",
-          description: "Testing importance score",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      // importanceScore는 qualityScore에서 설정됨
-      expect(analyzed?.importanceScore).toBeDefined();
-      expect(typeof analyzed?.importanceScore).toBe("number");
-    });
-
-    test("keywords 빈 배열로 초기화", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Keywords Test",
-          link: "https://example.com/keywords",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.keywords).toEqual([]);
-    });
-
-    test("AI 분석 필드 undefined", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "AI Fields Test",
-          link: "https://example.com/ai",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.soWhat).toBeUndefined();
-      expect(analyzed?.impactAnalysis).toBeUndefined();
-      expect(analyzed?.relatedContext).toBeUndefined();
-      expect(analyzed?.sentiment).toBeUndefined();
-      expect(analyzed?.category).toBeUndefined();
-    });
-  });
-
-  // ============================================
-  // 에지 케이스 테스트
-  // ============================================
-
-  describe("에지 케이스", () => {
-    test("빈 description 처리", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Empty Description",
-          link: "https://example.com/empty-desc",
-          description: "",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.headlineSummary).toBe("Empty Description");
-    });
-
-    test("공백만 있는 description 처리", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Whitespace Only",
-          link: "https://example.com/ws-only",
-          description: "   \n\t  ",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlNoImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.headlineSummary).toBe("Whitespace Only");
-    });
-
-    test("특수 문자가 포함된 URL 처리", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "Special URL",
-          link: "https://example.com/article?id=123&lang=ko",
-          description: "URL with query params",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      expect(result.success).toBe(true);
-      expect(result.articles.length).toBe(1);
-    });
-
-    test("한글 콘텐츠 처리", async () => {
-      const articles: RawNewsArticle[] = [
-        {
-          title: "한국 경제 뉴스 테스트",
-          link: "https://example.com/korean",
-          description: "이것은 한글 설명입니다. 경제 뉴스에 대한 내용을 담고 있습니다.",
-          source: "매일경제",
-          region: "KR",
-        },
-      ];
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-      const analyzed = result.articles[0];
-
-      expect(analyzed?.title).toBe("한국 경제 뉴스 테스트");
-      expect(analyzed?.headlineSummary).toContain("한글 설명");
-    });
-  });
-
-  // ============================================
-  // Stage 1: 대량 기사 필터링 테스트 (> 30개)
-  // ============================================
-
-  describe("Stage 1: 대량 기사 필터링 (기사 수 > 30)", () => {
-    test("50개 기사 입력시 30개로 필터링 후 20개 최종 선택", async () => {
-      const articles = createMockArticles(50);
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      expect(result.success).toBe(true);
-      // Stage 1: 50 → 30, Stage 2: 30 → 20
-      expect(result.articles.length).toBe(20);
-    }, 60000); // 60초 타임아웃 (OpenAI API 호출)
-
-    test("100개 기사 입력시 20개 최종 선택", async () => {
-      const articles = createMockArticles(100);
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      expect(result.success).toBe(true);
-      expect(result.articles.length).toBe(20);
-    }, 120000); // 120초 타임아웃 (여러 배치 처리)
-
-    test("필터링된 기사들이 원본 속성을 유지", async () => {
-      const articles = createMockArticles(35);
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      expect(result.success).toBe(true);
-
-      // 모든 결과 기사가 필수 속성을 가짐
-      for (const article of result.articles) {
-        expect(article.title).toBeDefined();
-        expect(article.link).toBeDefined();
-        expect(article.link).toMatch(/^https:\/\/example\.com\/article-\d+$/);
-      }
-    }, 60000);
-  });
-
-  // ============================================
-  // 성공/실패 결과 테스트
-  // ============================================
-
-  describe("성공/실패 결과", () => {
-    test("정상 처리시 success: true", async () => {
-      const articles = createMockArticles(5);
-
-      globalThis.fetch = mockFetch(() =>
-        Promise.resolve(new Response(sampleHtmlWithOgImage, { status: 200 }))
-      ) as typeof fetch;
-
-      const result = await analyzeNews(articles);
-
-      expect(result.success).toBe(true);
-      expect(result.error).toBeUndefined();
-    });
-
-    test("빈 입력시 success: true, 빈 배열", async () => {
-      const result = await analyzeNews([]);
-
-      expect(result.success).toBe(true);
+    test("전부 실패하면 0개 + success=false (예전: 0개 + success=true)", async () => {
+      createStructuredSpy.mockImplementation(async () => {
+        throw new Error("400");
+      });
+      const result = await analyzeNews(createMockArticles(5));
+      expect(result.success).toBe(false);
       expect(result.articles).toEqual([]);
+    });
+
+    test("일부 실패는 허용", async () => {
+      let n = 0;
+      createStructuredSpy.mockImplementation(async () => {
+        if (++n === 1) throw new Error("timeout");
+        return fakeAnalysis();
+      });
+      const result = await analyzeNews(createMockArticles(10));
+      expect(result.success).toBe(true);
+      expect(result.articles.length).toBe(9);
     });
   });
 });
