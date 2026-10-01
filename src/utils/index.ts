@@ -20,8 +20,9 @@ export function sanitizeMetaComments(text: string): string {
 // "참고/출처" 는 연도 인용("(참고: 2023, 2024)")과 겹쳐서 넣지 않는다.
 const ID_LIST = String.raw`#?\d+(?:\s*[,，、]\s*#?\d+)*`;
 const ARTICLE_REF_PATTERNS = [
-  new RegExp(String.raw`\s*[〔\[(（【]\s*(?:근거|기사)\s*(?:ID|id)?\s*[:：]?\s*${ID_LIST}\s*[〕\])）】]`, "g"),
-  new RegExp(String.raw`\s*[〔\[(（【]\s*(?:articleId|id)\s*[:=]\s*${ID_LIST}\s*[〕\])）】]`, "g"),
+  // 앞쪽 공백은 패턴에 넣지 않는다 (긴 공백열에서 시작점마다 재스캔 → O(n²)). 남는 공백은 아래에서 정리
+  new RegExp(String.raw`[〔\[(（【]\s*(?:근거|기사)\s*(?:(?:ID|id)\s*)?(?:[:：]\s*)?${ID_LIST}\s*[〕\])）】]`, "g"),
+  new RegExp(String.raw`[〔\[(（【]\s*(?:articleId|id)\s*[:=]\s*${ID_LIST}\s*[〕\])）】]`, "g"),
   /\bid=\d+/g,
 ];
 

@@ -24,6 +24,7 @@ describe("stripArticleRefs", () => {
     const evil = "(근거 " + "1 ".repeat(40) + "끝";
     const t = performance.now();
     stripArticleRefs(evil.repeat(20));
+    stripArticleRefs("(근거" + " ".repeat(20_000) + "x");
     expect(performance.now() - t).toBeLessThan(50);
   });
 
