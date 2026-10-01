@@ -16,9 +16,12 @@ export function sanitizeMetaComments(text: string): string {
 
 // 본문에 새는 기사 ID 인용 제거: "〔근거: 25568, 25565〕", "[근거: 123]", "(기사 7324)", "id=12" 등
 // 기사 ID 는 evidence.articleId 같은 지정 필드에만 있어야 한다
+// 숫자 목록은 겹치지 않는 형태로 써서 닫는 괄호가 없을 때의 과도한 백트래킹을 막는다.
+// "참고/출처" 는 연도 인용("(참고: 2023, 2024)")과 겹쳐서 넣지 않는다.
+const ID_LIST = String.raw`#?\d+(?:\s*[,，、]\s*#?\d+)*`;
 const ARTICLE_REF_PATTERNS = [
-  /\s*[〔\[(（【]\s*(?:근거|출처|기사|참고|ref)\s*(?:ID|id)?\s*[:：]?\s*(?:#?\d+\s*[,，、]?\s*)+[〕\])）】]/g,
-  /\s*[〔\[(（【]\s*(?:articleId|id)\s*[:=]\s*\d+(?:\s*,\s*\d+)*\s*[〕\])）】]/g,
+  new RegExp(String.raw`\s*[〔\[(（【]\s*(?:근거|기사)\s*(?:ID|id)?\s*[:：]?\s*${ID_LIST}\s*[〕\])）】]`, "g"),
+  new RegExp(String.raw`\s*[〔\[(（【]\s*(?:articleId|id)\s*[:=]\s*${ID_LIST}\s*[〕\])）】]`, "g"),
   /\bid=\d+/g,
 ];
 
@@ -70,6 +73,14 @@ export interface RetryOptions {
   delay?: number;
   maxDelay?: number; // 백오프 상한
   onRetry?: (error: Error, attempt: number) => void;
+  /** false 를 돌려주면 즉시 실패 (예: 잘못된 파라미터 400) */
+  shouldRetry?: (error: Error) => boolean;
+}
+
+/** HTTP 4xx 중 다시 보내도 같은 결과인 오류 (408/409/429 제외) */
+export function isNonRetryableHttpError(error: unknown): boolean {
+  const status = (error as { status?: unknown })?.status;
+  return typeof status === "number" && status >= 400 && status < 500 && ![408, 409, 429].includes(status);
 }
 
 // 지수 백오프를 적용한 재시도 유틸리티
@@ -77,7 +88,7 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {}
 ): Promise<T> {
-  const { retries = 3, delay = 1000, maxDelay = 5000, onRetry } = options;
+  const { retries = 3, delay = 1000, maxDelay = 5000, onRetry, shouldRetry } = options;
 
   let lastError: Error = new Error("Retry failed");
 
@@ -88,6 +99,7 @@ export async function withRetry<T>(
       lastError = error instanceof Error ? error : new Error(String(error));
 
       if (attempt === retries) break;
+      if (shouldRetry && !shouldRetry(lastError)) break;
 
       const backoffDelay = Math.min(delay * Math.pow(2, attempt), maxDelay);
       onRetry?.(lastError, attempt + 1);

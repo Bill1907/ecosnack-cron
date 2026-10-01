@@ -11,7 +11,10 @@ import { dateRange, isKstDateString } from "@/utils/kst.ts";
 export function parseReportArgs(argv: string[]) {
   const get = (flag: string) => {
     const i = argv.indexOf(flag);
-    return i >= 0 ? argv[i + 1] : undefined;
+    if (i < 0) return undefined;
+    const value = argv[i + 1];
+    if (value === undefined || value.startsWith("--")) throw new Error(`${flag} 다음에 값이 필요합니다`);
+    return value;
   };
   const date = get("--date");
   const from = get("--from");

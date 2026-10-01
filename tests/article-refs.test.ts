@@ -15,6 +15,18 @@ describe("stripArticleRefs", () => {
     expect(stripArticleRefs("id=123 기사에서 보듯")).toBe("기사에서 보듯");
   });
 
+  test("연도 인용은 남긴다", () => {
+    expect(stripArticleRefs("GDP(참고: 2023, 2024) 비교")).toBe("GDP(참고: 2023, 2024) 비교");
+    expect(stripArticleRefs("(출처: 2024)")).toBe("(출처: 2024)");
+  });
+
+  test("닫는 괄호 없는 긴 숫자열에서도 빠르다 (백트래킹 없음)", () => {
+    const evil = "(근거 " + "1 ".repeat(40) + "끝";
+    const t = performance.now();
+    stripArticleRefs(evil.repeat(20));
+    expect(performance.now() - t).toBeLessThan(50);
+  });
+
   test("일반 괄호와 숫자는 건드리지 않는다", () => {
     const keep = "코스피는 2,850(+1.2%)으로 마감했고, 기준금리(연 3.5%)는 동결됐어요.";
     expect(stripArticleRefs(keep)).toBe(keep);

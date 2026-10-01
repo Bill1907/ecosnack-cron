@@ -168,10 +168,13 @@ export async function validateEvidence(
 }
 
 /**
- * 검증 점수 (0-100). 판정된 근거가 없으면 null — 점수를 지어내지 않는다.
+ * 검증 점수 (0-100). 내용 판정(supports/contradicts/unrelated)이 하나도 없으면 null —
+ * 관련성 검증을 생략했을 때 invalid_id 하나만으로 0점이 되지 않게 한다.
  */
 export function calculateEvidenceScore(validation: EvidenceValidation): number | null {
-  const judged = validation.validCount + validation.invalidCount;
-  if (judged === 0) return null;
+  const contentJudged = validation.details.filter((d) =>
+    d.status === "supports" || d.status === "contradicts" || d.status === "unrelated"
+  ).length;
+  if (contentJudged === 0) return null;
   return validation.validationRate;
 }

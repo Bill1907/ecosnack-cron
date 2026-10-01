@@ -510,9 +510,14 @@ export async function saveDailyReport(
       sentimentAnalysis: report.sentimentAnalysis as unknown as Prisma.InputJsonValue,
       articleCount: report.articleCount,
       articleIds: report.articleIds,
-      qualityEvaluation: report.qualityEvaluation as unknown as Prisma.InputJsonValue,
-      evidenceValidation: report.evidenceValidation as unknown as Prisma.InputJsonValue,
-      qualityScore: report.qualityScore,
+      // 평가가 없으면(생략·실패) 명시적으로 NULL — undefined 는 update 에서 이전 실행 값을 남긴다
+      qualityEvaluation: report.qualityEvaluation
+        ? (report.qualityEvaluation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      evidenceValidation: report.evidenceValidation
+        ? (report.evidenceValidation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      qualityScore: report.qualityScore ?? null,
     },
     update: {
       title: report.title,
@@ -523,9 +528,14 @@ export async function saveDailyReport(
       sentimentAnalysis: report.sentimentAnalysis as unknown as Prisma.InputJsonValue,
       articleCount: report.articleCount,
       articleIds: report.articleIds,
-      qualityEvaluation: report.qualityEvaluation as unknown as Prisma.InputJsonValue,
-      evidenceValidation: report.evidenceValidation as unknown as Prisma.InputJsonValue,
-      qualityScore: report.qualityScore,
+      // 평가가 없으면(생략·실패) 명시적으로 NULL — undefined 는 update 에서 이전 실행 값을 남긴다
+      qualityEvaluation: report.qualityEvaluation
+        ? (report.qualityEvaluation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      evidenceValidation: report.evidenceValidation
+        ? (report.evidenceValidation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      qualityScore: report.qualityScore ?? null,
     },
   });
 

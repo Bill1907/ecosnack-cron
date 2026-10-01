@@ -13,6 +13,7 @@ export function sanitizeReportText(response: DailyReportAIResponse): DailyReport
   return {
     ...response,
     title: clean(response.title),
+    topKeywords: response.topKeywords.map(clean),
     executiveSummary: {
       ...response.executiveSummary,
       headline: clean(response.executiveSummary.headline),
@@ -34,8 +35,10 @@ export function sanitizeReportText(response: DailyReportAIResponse): DailyReport
         ...s,
         title: clean(s.title),
         content: clean(s.content),
+        keyData: s.keyData.map(clean),
       })),
       outlook: clean(response.marketOverview.outlook),
+      watchList: response.marketOverview.watchList.map(clean),
     },
     keyInsights: response.keyInsights.map((insight) => ({
       ...insight,

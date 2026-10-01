@@ -1,7 +1,7 @@
 import type { QualityCriterionKey, QualityEvaluation } from "@/schemas/quality-evaluation.ts";
 import type { DailyReportData } from "@/types/daily-report.ts";
 import { log } from "@/utils/index.ts";
-import { askJev, type ScoreQuestion, type ScoreAnswer } from "@/services/jev-client.ts";
+import { askJev, normalizedScore, type ScoreQuestion } from "@/services/jev-client.ts";
 
 // ============================================
 // 리포트 품질 평가 — Jev Score 6개를 한 요청으로
@@ -97,9 +97,11 @@ export async function evaluateReportQuality(report: DailyReportData): Promise<Qu
 
   const criteria = Object.fromEntries(
     keys.map((k) => {
-      const a = res.answers[k] as ScoreAnswer;
-      const levels = CRITERIA[k].levels.length;
-      return [k, { score: Math.round((a.score / (levels - 1)) * 100) / 10, confidence: a.confidence }];
+      const a = res.answers[k];
+      // 타입이 다르면 throw — NaN 점수를 저장하지 않는다
+      const norm = normalizedScore(a, CRITERIA[k].levels.length);
+      const confidence = a?.type === "score" ? a.confidence : 0;
+      return [k, { score: Math.round(norm * 100) / 10, confidence }];
     })
   ) as QualityEvaluation["criteria"];
 

@@ -73,6 +73,8 @@ export interface JevCallOptions {
 }
 
 const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 529]);
+// Retry-After 가 크게 와도 크론(Workers 15분 한도)을 붙잡지 않도록 상한
+const MAX_RETRY_AFTER_MS = 30_000;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -116,7 +118,7 @@ export async function askJev(
       const retryAfter = Number(res.headers.get("retry-after"));
       if (attempt < retries) {
         const wait = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
+          ? Math.min(retryAfter * 1000, MAX_RETRY_AFTER_MS)
           : baseDelayMs * 2 ** attempt;
         log(`Jev ${res.status} - ${wait}ms 후 재시도 (${attempt + 1}/${retries})`, "warn");
         await sleep(wait);

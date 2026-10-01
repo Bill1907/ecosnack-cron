@@ -84,6 +84,24 @@ describe("createStructured 재시도", () => {
   }, 10_000);
 });
 
+describe("createStructured 비재시도 오류", () => {
+  test.skipIf(!process.env.OPENAI_API_KEY)("400 은 한 번만 호출하고 실패", async () => {
+    const client = openaiClient.getOpenAIClient();
+    let calls = 0;
+    const logSpy = spyOn(console, "log").mockImplementation(() => {});
+    const spy = spyOn(client.chat.completions, "create").mockImplementation((async () => {
+      calls++;
+      throw Object.assign(new Error("400 Unsupported parameter: 'max_tokens'"), { status: 400 });
+    }) as Any);
+    await expect(openaiClient.createStructured({
+      schema: z.object({ a: z.string() }), name: "t", system: "s", user: "u", maxOutputTokens: 10,
+    })).rejects.toThrow("400");
+    spy.mockRestore();
+    logSpy.mockRestore();
+    expect(calls).toBe(1);
+  });
+});
+
 describe("jev-client", () => {
   let originalFetch: typeof fetch;
   let logSpy: Any;
@@ -210,7 +228,18 @@ describe("evidence-validator", () => {
     expect(v.invalidCount).toBe(1);
     expect(v.unverifiedCount).toBe(2);
     expect(v.validationRate).toBe(0);
-    expect(calculateEvidenceScore(v)).toBe(0);
+    // 내용 판정이 하나도 없으므로 점수는 없음 (invalid_id 만으로 0점 처리하지 않는다)
+    expect(calculateEvidenceScore(v)).toBeNull();
+  });
+
+  test("관련성 검증을 생략하면 invalid_id 하나로 0점이 되지 않는다 (null)", async () => {
+    const v = await validateEvidence(
+      reportWithEvidence([{ text: "a", articleId: 1 }, { text: "b", articleId: 2 }, { text: "c", articleId: 99 }]),
+      [article(1), article(2)],
+      { checkRelevance: false }
+    );
+    expect(v.details.map((d) => d.status)).toEqual(["unverified", "unverified", "invalid_id"]);
+    expect(calculateEvidenceScore(v)).toBeNull();
   });
 
   test("판정된 근거가 없으면 점수는 null", async () => {

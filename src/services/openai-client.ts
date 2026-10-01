@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { z } from "zod";
 import { config } from "@/config/index.ts";
-import { withRetry, withTimeout } from "@/utils/index.ts";
+import { withRetry, withTimeout, isNonRetryableHttpError } from "@/utils/index.ts";
 
 let client: OpenAI | null = null;
 
@@ -71,7 +71,8 @@ export async function createStructured<S extends z.ZodType>(
         }
         return req.schema.parse(JSON.parse(content));
       },
-      { retries: req.retries ?? 2, delay: 2000 }
+      // 400/401/404 (잘못된 파라미터·모델명)는 다시 보내도 같다 — 바로 실패시켜 유료 호출 낭비를 막는다
+      { retries: req.retries ?? 2, delay: 2000, shouldRetry: (e) => !isNonRetryableHttpError(e) }
     ),
     timeoutMs,
     `${req.name} 타임아웃 (${Math.round(timeoutMs / 1000)}초)`
