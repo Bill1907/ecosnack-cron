@@ -1,34 +1,7 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test";
-import { getKSTDate, toKSTISOString, log, getErrorMessage } from "@/utils/index.ts";
+import { log, getErrorMessage } from "@/utils/index.ts";
 
 describe("utils", () => {
-  describe("getKSTDate", () => {
-    test("returns a valid Date object", () => {
-      const result = getKSTDate();
-      expect(result).toBeInstanceOf(Date);
-    });
-
-    test("returns a date that is not NaN", () => {
-      const result = getKSTDate();
-      expect(isNaN(result.getTime())).toBe(false);
-    });
-  });
-
-  describe("toKSTISOString", () => {
-    test("returns a valid ISO string", () => {
-      const date = new Date("2024-01-15T10:30:00Z");
-      const result = toKSTISOString(date);
-      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-    });
-
-    test("returns an ISO string for any valid date", () => {
-      const date = new Date();
-      const result = toKSTISOString(date);
-      expect(typeof result).toBe("string");
-      expect(result.endsWith("Z")).toBe(true);
-    });
-  });
-
   describe("log", () => {
     let consoleSpy: ReturnType<typeof spyOn>;
 

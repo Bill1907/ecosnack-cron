@@ -1,6 +1,4 @@
-import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { config } from "@/config/index.ts";
 import { getPrisma } from "@/services/database.ts";
 import {
   DailyReportAIResponseSchema,
@@ -16,7 +14,9 @@ import {
   buildArticleUrl,
 } from "@/types/daily-report.ts";
 import type { NewsRecord } from "@/types/index.ts";
-import { log, getErrorMessage, withRetry, withTimeout, getKSTDate, sanitizeMetaComments } from "@/utils/index.ts";
+import { log, getErrorMessage } from "@/utils/index.ts";
+import { sanitizeReportText } from "@/services/report-sanitizer.ts";
+import { kstDayRange, toDbDate, fromDbDate } from "@/utils/kst.ts";
 import {
   validateEvidence,
   calculateEvidenceScore,
@@ -25,7 +25,7 @@ import {
   evaluateReportQuality,
   calculateFinalQualityScore,
 } from "@/services/quality-evaluator.ts";
-import { getOpenAIClient } from "@/services/openai-client.ts";
+import { createStructured } from "@/services/openai-client.ts";
 
 // ============================================
 // 시스템 프롬프트
@@ -86,7 +86,7 @@ const DAILY_REPORT_SYSTEM_PROMPT = `당신은 전문 경제 애널리스트입�
 ### 텍스트 포맷 규칙 (매우 중요! 반드시 준수!)
 - 마크다운 문법 사용 금지 (**, *, #, - 등의 서식 문자 사용하지 않음)
 - 본문 텍스트(title, headline, overview, summary, content, analysis, description 등 모든 텍스트 필드)에 기사 번호나 ID를 절대 포함하지 마세요
-  - 금지 예시: "기사 7324에 따르면", "기사 3 근거", "(articleId: 15)", "[기사 6190]", "id=123 기사", "#5 기사에서"
+  - 금지 예시: "기사 7324에 따르면", "기사 3 근거", "(articleId: 15)", "[기사 6190]", "id=123 기사", "#5 기사에서", "〔근거: 25568, 25565〕"
   - 기사를 언급할 때는 기사 제목이나 출처명으로 자연스럽게 서술하세요 (예: "CNBC 보도에 따르면", "삼성전자 실적 관련 기사에서")
 - 기사 ID는 반드시 evidence.articleId, relatedArticleIds 등 지정된 JSON 필드에만 숫자로 기록
 - 모든 텍스트는 순수한 일반 텍스트로 작성 (독자가 읽기 자연스러운 문장)
@@ -103,24 +103,19 @@ const DAILY_REPORT_SYSTEM_PROMPT = `당신은 전문 경제 애널리스트입�
 // 해당 날짜의 기사 조회
 // ============================================
 
-export async function getDailyArticles(
-  targetDate?: Date
-): Promise<NewsRecord[]> {
+/**
+ * KST 기준 하루(00:00~24:00) 동안 수집된 기사.
+ * @param date "YYYY-MM-DD" (KST 날짜)
+ */
+export async function getDailyArticles(date: string): Promise<NewsRecord[]> {
   const db = getPrisma();
-  const date = targetDate ?? getKSTDate();
-
-  // 해당 날짜의 시작과 끝 시간 계산 (KST 기준)
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  const { start, end } = kstDayRange(date);
 
   const articles = await db.article.findMany({
     where: {
       createdAt: {
-        gte: startOfDay,
-        lte: endOfDay,
+        gte: start,
+        lt: end,
       },
     },
     orderBy: [
@@ -193,65 +188,12 @@ function formatArticlesForAI(articles: NewsRecord[]): string {
 }
 
 // ============================================
-// 메타 코멘트 제거 (프롬프트 누수 방지)
-// ============================================
-
-function sanitizeAIResponse(
-  response: DailyReportAIResponse
-): DailyReportAIResponse {
-  return {
-    ...response,
-    title: sanitizeMetaComments(response.title),
-    executiveSummary: {
-      ...response.executiveSummary,
-      headline: sanitizeMetaComments(response.executiveSummary.headline),
-      overview: sanitizeMetaComments(response.executiveSummary.overview),
-      highlights: response.executiveSummary.highlights.map((h) => ({
-        ...h,
-        description: sanitizeMetaComments(h.description),
-      })),
-      sentiment: {
-        ...response.executiveSummary.sentiment,
-        description: sanitizeMetaComments(
-          response.executiveSummary.sentiment.description
-        ),
-      },
-    },
-    marketOverview: {
-      ...response.marketOverview,
-      summary: sanitizeMetaComments(response.marketOverview.summary),
-      sections: response.marketOverview.sections.map((s) => ({
-        ...s,
-        content: sanitizeMetaComments(s.content),
-      })),
-      outlook: sanitizeMetaComments(response.marketOverview.outlook),
-    },
-    keyInsights: response.keyInsights.map((insight) => ({
-      ...insight,
-      summary: sanitizeMetaComments(insight.summary),
-      analysis: sanitizeMetaComments(insight.analysis),
-      implications: {
-        investors: sanitizeMetaComments(insight.implications.investors),
-        workers: sanitizeMetaComments(insight.implications.workers),
-        consumers: sanitizeMetaComments(insight.implications.consumers),
-      },
-      evidence: insight.evidence.map((e) => ({
-        ...e,
-        text: sanitizeMetaComments(e.text),
-      })),
-    })),
-  };
-}
-
-// ============================================
 // AI로 데일리 리포트 분석
 // ============================================
 
 async function analyzeForDailyReport(
   articles: NewsRecord[]
 ): Promise<DailyReportAIResponse> {
-  const client = getOpenAIClient();
-
   // 상위 30개 기사만 사용 (토큰 제한)
   const topArticles = articles.slice(0, 30);
   const articleIds = topArticles.map((a) => a.id);
@@ -274,32 +216,17 @@ ${formattedArticles}
 4. 텍스트 필드에 "기사 N", "id=N", "#N" 같은 기사 참조를 절대 삽입하지 마세요. 기사 ID는 지정된 JSON 필드에만 기록하세요
 5. 모든 텍스트는 반드시 한국어만 사용하세요 (일본어, 중국어 등 혼용 금지)`;
 
-  const REPORT_GENERATION_TIMEOUT = 300_000; // 5분
-  const response = await withTimeout(
-    withRetry(
-      () =>
-        client.chat.completions.create({
-          model: config.openai.model,
-          messages: [
-            { role: "system", content: DAILY_REPORT_SYSTEM_PROMPT },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: zodResponseFormat(DailyReportAIResponseSchema, "daily_report"),
-          max_completion_tokens: 12000,
-        }),
-      { retries: 3, delay: 2000 }
-    ),
-    REPORT_GENERATION_TIMEOUT,
-    "데일리 리포트 AI 분석 타임아웃 (5분)"
-  );
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("Empty response from OpenAI");
-  }
-
-  const parsed = DailyReportAIResponseSchema.parse(JSON.parse(content));
-  return sanitizeAIResponse(parsed);
+  const parsed = await createStructured({
+    schema: DailyReportAIResponseSchema,
+    name: "daily_report",
+    system: DAILY_REPORT_SYSTEM_PROMPT,
+    user: userPrompt,
+    // 기본 추론은 출력 상한을 먹어 finish_reason=length 로 빈 응답이 난다 (개인화 2/4 실측)
+    reasoningEffort: "low",
+    maxOutputTokens: 32000,
+    timeoutMs: 420_000,
+  });
+  return sanitizeReportText(parsed);
 }
 
 // ============================================
@@ -326,7 +253,7 @@ function buildRelatedArticlesFromIds(
 function transformAIResponseToReportData(
   aiResponse: DailyReportAIResponse,
   articles: NewsRecord[],
-  targetDate: Date
+  date: string
 ): DailyReportData {
   const articlesMap = new Map(articles.map((a) => [a.id, a]));
 
@@ -422,7 +349,7 @@ function transformAIResponseToReportData(
       : "neutral";
 
   return {
-    reportDate: targetDate,
+    reportDate: toDbDate(date),
     title: aiResponse.title,
     executiveSummary,
     marketOverview,
@@ -446,26 +373,30 @@ function transformAIResponseToReportData(
 export interface GenerateDailyReportOptions {
   skipQualityEvaluation?: boolean;
   skipEvidenceRelevanceCheck?: boolean; // AI 관련성 검증 스킵 (비용 절감)
+  dryRun?: boolean; // true 면 DB에 저장하지 않는다
 }
 
 export interface GenerateDailyReportResult {
   success: boolean;
   reportId?: number;
-  reportDate?: Date;
+  reportDate?: string;
   articleCount?: number;
   qualityScore?: number;
   error?: string;
+  /** dry-run 일 때만: 저장하지 않은 리포트 본문 */
+  data?: DailyReportData;
 }
 
+/**
+ * @param date 리포트 기준일 "YYYY-MM-DD" (KST). 그날 KST 00:00~24:00 에 수집된 기사로 만든다.
+ */
 export async function generateDailyReport(
-  targetDate?: Date,
+  date: string,
   options: GenerateDailyReportOptions = {}
 ): Promise<GenerateDailyReportResult> {
-  const { skipQualityEvaluation = false, skipEvidenceRelevanceCheck = false } = options;
-  const date = targetDate ?? getKSTDate();
-  const dateStr = date.toISOString().split("T")[0];
+  const { skipQualityEvaluation = false, skipEvidenceRelevanceCheck = false, dryRun = false } = options;
 
-  log(`=== 데일리 리포트 생성 시작 (${dateStr}) ===`);
+  log(`=== 데일리 리포트 생성 시작 (${date}${dryRun ? ", dry-run" : ""}) ===`);
 
   try {
     // 1. 해당 날짜의 기사 조회
@@ -500,7 +431,6 @@ export async function generateDailyReport(
     if (!skipQualityEvaluation) {
       try {
         // 4-1. 근거 검증
-        log("근거 검증 시작...");
         const evidenceValidation = await validateEvidence(reportData, articles, {
           checkRelevance: !skipEvidenceRelevanceCheck,
         });
@@ -525,13 +455,17 @@ export async function generateDailyReport(
     }
 
     // 5. DB 저장
+    if (dryRun) {
+      log(`dry-run: 저장 생략 (기사 ${reportData.articleCount}개, 품질 ${reportData.qualityScore ?? "없음"})`);
+      return { success: true, reportDate: date, articleCount: reportData.articleCount, qualityScore: reportData.qualityScore, data: reportData };
+    }
     const savedReport = await saveDailyReport(reportData);
-    log(`데일리 리포트 저장 완료 (ID: ${savedReport.id})`);
+    log(`데일리 리포트 저장 완료 (ID: ${savedReport.id}, ${date})`);
 
     return {
       success: true,
       reportId: savedReport.id,
-      reportDate: savedReport.reportDate,
+      reportDate: fromDbDate(savedReport.reportDate),
       articleCount: savedReport.articleCount,
       qualityScore: reportData.qualityScore,
     };
@@ -561,9 +495,8 @@ export async function saveDailyReport(
 ): Promise<{ id: number; reportDate: Date; articleCount: number }> {
   const db = getPrisma();
 
-  // 날짜만 추출 (시간 제거)
-  const reportDateOnly = new Date(report.reportDate);
-  reportDateOnly.setHours(0, 0, 0, 0);
+  // reportDate 는 toDbDate() 로 만든 UTC 자정 값 (Postgres date)
+  const reportDateOnly = report.reportDate;
 
   const result = await db.dailyReport.upsert({
     where: { reportDate: reportDateOnly },
@@ -577,9 +510,14 @@ export async function saveDailyReport(
       sentimentAnalysis: report.sentimentAnalysis as unknown as Prisma.InputJsonValue,
       articleCount: report.articleCount,
       articleIds: report.articleIds,
-      qualityEvaluation: report.qualityEvaluation as unknown as Prisma.InputJsonValue,
-      evidenceValidation: report.evidenceValidation as unknown as Prisma.InputJsonValue,
-      qualityScore: report.qualityScore,
+      // 평가가 없으면(생략·실패) 명시적으로 NULL — undefined 는 update 에서 이전 실행 값을 남긴다
+      qualityEvaluation: report.qualityEvaluation
+        ? (report.qualityEvaluation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      evidenceValidation: report.evidenceValidation
+        ? (report.evidenceValidation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      qualityScore: report.qualityScore ?? null,
     },
     update: {
       title: report.title,
@@ -590,9 +528,14 @@ export async function saveDailyReport(
       sentimentAnalysis: report.sentimentAnalysis as unknown as Prisma.InputJsonValue,
       articleCount: report.articleCount,
       articleIds: report.articleIds,
-      qualityEvaluation: report.qualityEvaluation as unknown as Prisma.InputJsonValue,
-      evidenceValidation: report.evidenceValidation as unknown as Prisma.InputJsonValue,
-      qualityScore: report.qualityScore,
+      // 평가가 없으면(생략·실패) 명시적으로 NULL — undefined 는 update 에서 이전 실행 값을 남긴다
+      qualityEvaluation: report.qualityEvaluation
+        ? (report.qualityEvaluation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      evidenceValidation: report.evidenceValidation
+        ? (report.evidenceValidation as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
+      qualityScore: report.qualityScore ?? null,
     },
   });
 
@@ -607,16 +550,12 @@ export async function saveDailyReport(
 // 조회 함수
 // ============================================
 
-export async function getDailyReport(
-  targetDate: Date
-): Promise<DailyReportData | null> {
+/** @param date "YYYY-MM-DD" */
+export async function getDailyReport(date: string): Promise<DailyReportData | null> {
   const db = getPrisma();
 
-  const reportDateOnly = new Date(targetDate);
-  reportDateOnly.setHours(0, 0, 0, 0);
-
   const report = await db.dailyReport.findUnique({
-    where: { reportDate: reportDateOnly },
+    where: { reportDate: toDbDate(date) },
   });
 
   if (!report) {

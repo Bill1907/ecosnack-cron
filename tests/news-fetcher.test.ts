@@ -1,5 +1,14 @@
-import { describe, test, expect, spyOn, beforeEach, afterEach, mock } from "bun:test";
-import { fetchAllNews, getNewsSources } from "@/services/news-fetcher.ts";
+import { describe, test, expect, spyOn, beforeEach, afterEach, beforeAll, afterAll, mock } from "bun:test";
+import { fetchAllNews, getNewsSources, FETCH_OPTIONS } from "@/services/news-fetcher.ts";
+
+// 재시도 대기를 줄여 실패 경로 테스트가 기본 5초 제한 안에 끝나게 한다
+const savedDelay = FETCH_OPTIONS.retryDelayMs;
+beforeAll(() => {
+  FETCH_OPTIONS.retryDelayMs = 1;
+});
+afterAll(() => {
+  FETCH_OPTIONS.retryDelayMs = savedDelay;
+});
 
 // Bun fetch mock 타입 호환성 해결
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

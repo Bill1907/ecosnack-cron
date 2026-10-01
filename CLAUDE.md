@@ -9,17 +9,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 주요 명령어
 
 ```bash
-# 뉴스 수집/분석 실행
+# 뉴스 수집/분석 실행 (--dry-run: 저장 안 함)
 bun run cron
 
-# 데일리 리포트 생성
+# 데일리 리포트 생성 — 기준일 = 실행 시각 기준 KST 어제
 bun run report
+bun run report --date 2026-09-26                       # 특정 날짜
+bun run report --from 2026-08-01 --to 2026-08-19 --skip-personalized   # 백필
+bun run report --date 2026-09-30 --dry-run --out /tmp  # 저장 없이 본문 JSON 확인
+bun run report:personal                                # 개인화만
 
 # 개발 모드 (watch)
 bun run dev
 
 # 테스트
 bun test
+bun run test:tz              # TZ=UTC / Asia/Seoul 두 번 (날짜 계산 검증)
 bun test --watch              # watch 모드
 bun test tests/specific.test.ts  # 단일 파일
 
@@ -34,21 +39,36 @@ bun run db:studio     # Studio 실행
 
 ## 아키텍처
 
-### 뉴스 수집 파이프라인 (`src/index.ts`)
+### 뉴스 수집 파이프라인 (`src/jobs/collect-news.ts`, CLI `src/index.ts`)
 ```
-RSS 수집 → Stage 0: 중복 필터링 → Stage 1: 제목 필터링 (250→30)
-         → Stage 2: 품질 필터링 + 이미지 추출 (30→20)
-         → Stage 3: AI 상세 분석 (병렬) → DB 저장
+RSS 수집 → Stage 0: 중복 필터링 → Stage 1: 제목 점수 (Jev, 250→30)
+         → Stage 2: 품질 점수 (Jev) + 이미지 추출 (30→20)
+         → Stage 3: 상세 분석 (gpt-6-luna, 병렬) → DB 저장
+Stage 3 성공률 < 50% 이면 exit 1 (0개 저장하고 성공으로 끝나지 않게)
 ```
 
-### 데일리 리포트 파이프라인 (`src/generate-report.ts`)
+### 데일리 리포트 파이프라인 (`src/jobs/report.ts`, CLI `src/generate-report.ts`)
 ```
-오늘 기사 조회 (상위 30개) → AI 종합 분석 → DB 저장 (upsert)
+기준일(KST 어제) 00:00~24:00 기사 조회 → 종합 분석 (gpt-6-luna)
+→ 근거 검증 (Jev Choice, 확신도 < 0.8 은 gpt-5.6-luna 재판정) → 품질 평가 (Jev Score ×6)
+→ DB 저장 (upsert) → 개인화 리포트 (동시 3명)
 ```
+
+### 모델 역할
+- **판정 (Jev, TypeSafe System One)**: 제목/품질 점수, 근거 검증, 리포트 품질 평가 — `services/jev-client.ts`
+- **생성 (OpenAI)**: 기사 분석, 리포트 작성 — `services/openai-client.ts` 의 `createStructured()` 만 쓴다
+- gpt-5 이후 모델은 `max_tokens` / `temperature≠1` 을 400 으로 거부 → `max_completion_tokens` 만, temperature 는 보내지 않는다
+- 판정 실패를 "유효"나 기본 점수로 메우지 않는다. 근거는 `unverified`, 점수 서비스는 LLM 폴백 후에도 실패하면 throw
+
+### 날짜
+- 날짜 계산은 `utils/kst.ts` 의 순수 함수만 쓴다 (`setHours`, 로컬 TZ 의존 금지). Render 는 TZ=Asia/Seoul, Workers 는 UTC
+- `report_date`(Postgres date) 는 `toDbDate("YYYY-MM-DD")` = UTC 자정
 
 ### 핵심 서비스
 - `services/news-fetcher.ts` - RSS 피드 수집
-- `services/news-analyzer.ts` - 3단계 필터링 + AI 분석 (OpenAI)
+- `services/news-analyzer.ts` - 3단계 필터링 + AI 분석
+- `services/article-scoring.ts` - 제목/품질 점수 (Jev → LLM 폴백)
+- `services/evidence-validator.ts`, `services/quality-evaluator.ts` - 리포트 근거·품질 판정 (Jev)
 - `services/daily-report.ts` - 데일리 리포트 생성
 - `services/database.ts` - Prisma + NEON 어댑터
 - `services/prompt-builder.ts` - Few-shot + CoT 프롬프트 동적 생성
@@ -62,7 +82,7 @@ RSS 수집 → Stage 0: 중복 필터링 → Stage 1: 제목 필터링 (250→30
 
 - **Runtime**: Bun (Node.js, npm, vite 대신 Bun 사용)
 - **Database**: NEON PostgreSQL + Prisma 7 + @prisma/adapter-neon
-- **AI**: OpenAI API (gpt-4o-mini), zodResponseFormat 사용
+- **AI**: OpenAI (생성: gpt-6-luna, 재판정: gpt-5.6-luna), TypeSafe Jev `jev-1.13.0` (판정)
 - **Validation**: Zod
 
 ## 코드 규칙
