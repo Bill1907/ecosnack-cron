@@ -2,7 +2,7 @@ import type { DailyReportAIResponse } from "@/schemas/daily-report.ts";
 import { sanitizeMetaComments, stripArticleRefs } from "@/utils/index.ts";
 
 // ============================================
-// 리포트 본문 정리 (일반·개인화 공통)
+// 리포트 본문 정리
 // - 글자 수 같은 메타 코멘트 제거
 // - 본문에 새는 기사 ID 인용 제거 (ID 는 지정 JSON 필드에만)
 // ============================================
