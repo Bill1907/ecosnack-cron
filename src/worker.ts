@@ -8,7 +8,7 @@ import { runReportJob } from "@/jobs/report.ts";
 export const CRONS = {
   /** KST 03/09/15/21시 — 뉴스 수집·분석 */
   collect: "0 0,6,12,18 * * *",
-  /** KST 07시 — 전날(KST) 데일리 리포트 + 개인화 */
+  /** KST 07시 — 전날(KST) 데일리 리포트 */
   report: "0 22 * * *",
 } as const;
 

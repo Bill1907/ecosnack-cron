@@ -15,9 +15,8 @@ bun run cron
 # 데일리 리포트 생성 — 기준일 = 실행 시각 기준 KST 어제
 bun run report
 bun run report --date 2026-09-26                       # 특정 날짜
-bun run report --from 2026-08-01 --to 2026-08-19 --skip-personalized   # 백필
+bun run report --from 2026-08-01 --to 2026-08-19       # 백필
 bun run report --date 2026-09-30 --dry-run --out /tmp  # 저장 없이 본문 JSON 확인
-bun run report:personal                                # 개인화만
 
 # 개발 모드 (watch)
 bun run dev
@@ -51,7 +50,7 @@ Stage 3 성공률 < 50% 이면 exit 1 (0개 저장하고 성공으로 끝나지 
 ```
 기준일(KST 어제) 00:00~24:00 기사 조회 → 종합 분석 (gpt-6-luna)
 → 근거 검증 (Jev Choice, 확신도 < 0.8 은 gpt-5.6-luna 재판정) → 품질 평가 (Jev Score ×6)
-→ DB 저장 (upsert) → 개인화 리포트 (동시 3명)
+→ DB 저장 (upsert)
 ```
 
 ### 모델 역할
