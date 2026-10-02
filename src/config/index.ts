@@ -10,7 +10,7 @@ export const config = {
     qualityFilterLimit: 20, // Stage 2: 30 -> 20
   },
   models: {
-    // 글을 쓰는 역할: 기사 상세 분석, 데일리/개인화 리포트
+    // 글을 쓰는 역할: 기사 상세 분석, 데일리 리포트
     generate: process.env.OPENAI_MODEL ?? "gpt-6-luna",
     // Jev 확신도가 낮을 때, 또는 Jev 장애 시 대신 판정하는 모델
     fallbackJudge: process.env.OPENAI_FALLBACK_JUDGE_MODEL ?? "gpt-5.6-luna",

@@ -2,10 +2,9 @@ import { runReportJob } from "@/jobs/report.ts";
 import { dateRange, isKstDateString } from "@/utils/kst.ts";
 
 /**
- * bun run report                         KST 어제 리포트 (일반 + 개인화)
+ * bun run report                         KST 어제 리포트
  * bun run report --date 2026-09-26       특정 날짜
- * bun run report --from 2026-08-01 --to 2026-08-19 [--skip-personalized]
- * bun run report:personal [--date ...]   개인화만
+ * bun run report --from 2026-08-01 --to 2026-08-19
  * 공통: --dry-run (저장 안 함), --out <dir> (dry-run 리포트 본문 JSON 저장)
  */
 export function parseReportArgs(argv: string[]) {
@@ -29,8 +28,6 @@ export function parseReportArgs(argv: string[]) {
   return {
     dates: date ? [date] : from && to ? dateRange(from, to) : undefined,
     dryRun: argv.includes("--dry-run"),
-    skipPersonalized: argv.includes("--skip-personalized"),
-    personalizedOnly: argv.includes("--personalized-only"),
     outDir: get("--out"),
   };
 }
