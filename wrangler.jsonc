@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ecosnack-cron",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-30",
+  "compatibility_flags": ["nodejs_compat"],
+  // 공개 URL 불필요 — 크론 전용
+  "workers_dev": false,
+  "preview_urls": false,
+  // UTC 기준. src/worker.ts 의 CRONS 와 같아야 한다
+  "triggers": {
+    "crons": ["0 0,6,12,18 * * *", "0 22 * * *"]
+  },
+  // 6시간/1일 간격 크론의 CPU 상한은 15분이지만 설정값 최대는 5분
+  "limits": { "cpu_ms": 300000 },
+  "observability": { "enabled": true }
+  // 비밀값: wrangler secret put DATABASE_URL / OPENAI_API_KEY / TYPESAFE_API_KEY
+  // 로컬: .dev.vars (gitignore)
+}
