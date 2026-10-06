@@ -66,9 +66,8 @@ describe("parseReportArgs", () => {
     expect(parseReportArgs(["--date", "2026-09-26"]).dates).toEqual(["2026-09-26"]);
   });
   test("--from/--to + 플래그", () => {
-    const a = parseReportArgs(["--from", "2026-08-01", "--to", "2026-08-03", "--skip-personalized", "--dry-run"]);
+    const a = parseReportArgs(["--from", "2026-08-01", "--to", "2026-08-03", "--dry-run"]);
     expect(a.dates).toEqual(["2026-08-01", "2026-08-02", "2026-08-03"]);
-    expect(a.skipPersonalized).toBe(true);
     expect(a.dryRun).toBe(true);
   });
   test("잘못된 조합은 거부", () => {

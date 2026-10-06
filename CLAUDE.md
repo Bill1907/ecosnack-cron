@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-경제 뉴스를 수집하고 AI로 분석하여 NEON PostgreSQL에 저장하는 크론 작업 시스템. Render에서 Docker 기반으로 운영.
+경제 뉴스를 수집하고 AI로 분석하여 NEON PostgreSQL에 저장하는 크론 작업 시스템. Cloudflare Workers Cron Triggers 로 운영 (2026-10 Render 에서 이전).
 
 ## 주요 명령어
 
@@ -15,9 +15,8 @@ bun run cron
 # 데일리 리포트 생성 — 기준일 = 실행 시각 기준 KST 어제
 bun run report
 bun run report --date 2026-09-26                       # 특정 날짜
-bun run report --from 2026-08-01 --to 2026-08-19 --skip-personalized   # 백필
+bun run report --from 2026-08-01 --to 2026-08-19       # 백필
 bun run report --date 2026-09-30 --dry-run --out /tmp  # 저장 없이 본문 JSON 확인
-bun run report:personal                                # 개인화만
 
 # 개발 모드 (watch)
 bun run dev
@@ -51,7 +50,7 @@ Stage 3 성공률 < 50% 이면 exit 1 (0개 저장하고 성공으로 끝나지 
 ```
 기준일(KST 어제) 00:00~24:00 기사 조회 → 종합 분석 (gpt-6-luna)
 → 근거 검증 (Jev Choice, 확신도 < 0.8 은 gpt-5.6-luna 재판정) → 품질 평가 (Jev Score ×6)
-→ DB 저장 (upsert) → 개인화 리포트 (동시 3명)
+→ DB 저장 (upsert)
 ```
 
 ### 모델 역할
@@ -100,8 +99,13 @@ Stage 3 성공률 < 50% 이면 exit 1 (0개 저장하고 성공으로 끝나지 
 
 ## 배포
 
-Render Cron Jobs (Docker):
-- 뉴스 수집: `bun run cron` (6시간마다)
-- 리포트 생성: `bun run report` (1일 1회)
+Cloudflare Workers (`src/worker.ts`, `wrangler.jsonc`, Workers Paid 플랜 필요):
+- 뉴스 수집: UTC `0 0,6,12,18 * * *` (KST 03/09/15/21시)
+- 리포트 생성: UTC `0 22 * * *` (KST 07시, 기준일 = KST 어제)
+- 배포: `bunx wrangler deploy` (크론 식을 바꾸면 `src/worker.ts` 의 `CRONS` 도 같이 — 테스트가 검사한다)
+- 비밀값: `bunx wrangler secret put DATABASE_URL | OPENAI_API_KEY | TYPESAFE_API_KEY | OPENAI_MODEL`
+- 로컬 검증: `.env` 를 `.dev.vars` 로 복사 + `DRY_RUN=true` → `bunx wrangler dev --test-scheduled` 후
+  `curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=0+22+*+*+*"`
+- 수동 실행·백필은 Workers 가 아니라 로컬 CLI (`bun run report --from ... --to ...`)
 
-Docker Command 오버라이드로 같은 이미지에서 다른 작업 실행.
+Render Cron Jobs(Docker, `Dockerfile`)는 2026-10-02 정지 — 되돌릴 때만 Resume.
