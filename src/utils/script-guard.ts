@@ -31,9 +31,14 @@ export const HAN_ABBREVIATION_ALLOWLIST = [
 
 const ALLOWED_HAN = new Set(HAN_ABBREVIATION_ALLOWLIST);
 
+// Script=Common 이지만 한국어 문장에 쓰이지 않는 중국어·일본어 문장부호·기호. 운영 데이터에서 「좋겠어요。」 }}}},」처럼
+// 마침표 대신 나온 「。」가 기사 34곳에 있었다. 「」『』 는 한국어에서도 쓰므로 넣지 않는다.
+export const CJK_ONLY_PUNCTUATION = "。、ー〆ｰﾞﾟ\u3000\uFFFD";
+
 const OK = String.raw`\p{Script=Hangul}\p{Script=Latin}\p{Script=Greek}\p{Script=Common}\p{Script=Inherited}`;
 // 정상 문자가 아닌 글자 + 거기 붙은 결합 표시(\p{M}). 라틴 글자에 붙은 악센트는 덩어리가 되지 않는다.
-const FOREIGN_CHUNK = new RegExp(String.raw`[^${OK}](?:[^${OK}]|\p{M})*`, "gu");
+const FOREIGN_CHAR = String.raw`[^${OK}]|[${CJK_ONLY_PUNCTUATION}]`;
+const FOREIGN_CHUNK = new RegExp(String.raw`(?:${FOREIGN_CHAR})(?:${FOREIGN_CHAR}|\p{M})*`, "gu");
 const HAN_ONLY = /^\p{Script=Han}+$/u;
 const HANGUL = /\p{Script=Hangul}/u;
 
@@ -74,6 +79,8 @@ export function findForeignScript(text: string, source = ""): ScriptIssue[] {
 
   for (const pattern of PROMPT_LEAK_PATTERNS) {
     for (const m of text.matchAll(pattern)) {
+      // 입력 원문에 같은 문구가 있으면 기사 내용이다 (예: "광고 규칙 준수 점검", "비밀번호 12자 이상")
+      if (source.includes(m[0])) continue;
       issues.push({ run: m[0], index: m.index, reason: "prompt-leak" });
     }
   }

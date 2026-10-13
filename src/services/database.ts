@@ -161,7 +161,7 @@ export async function saveNewsArticles(
   return savedCount;
 }
 
-// 여러 뉴스 기사 배치 저장 (INSERT 한 번, 중복 링크는 건너뜀)
+// 여러 뉴스 기사 배치 저장 (INSERT 한 문장, 중복 링크는 건너뜀)
 export async function saveNewsArticlesBatch(
   articles: AnalyzedNewsArticle[]
 ): Promise<number> {
@@ -172,7 +172,8 @@ export async function saveNewsArticlesBatch(
   const db = getPrisma();
 
   try {
-    // $transaction([...upsert]) 는 5초 한도를 넘겨 매번 실패했다
+    // $transaction([...upsert]) 는 Workers 에서 5초 한도를 넘겨 매번 실패했다.
+    // createMany 는 INSERT … ON CONFLICT DO NOTHING 한 문장이고, Prisma 가 감싸는 내부 트랜잭션에는 시간 한도가 없다
     const { count } = await db.article.createMany({
       data: articles.map((article) => ({
         title: article.title,

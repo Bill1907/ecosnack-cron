@@ -291,3 +291,26 @@ describe("describeScriptIssues", () => {
     expect(msg).toContain("외 3건");
   });
 });
+
+describe("findForeignScript — 리뷰 반영 (V1 T1-T3)", () => {
+  test("지시문 누출 문구라도 입력 원문에 있으면 기사 내용이라 통과", () => {
+    expect(findForeignScript("금융위가 가상자산 광고 규칙 준수 여부를 점검해요.", "금융위, 가상자산 광고 규칙 준수 점검")).toEqual([]);
+    expect(findForeignScript("공공 사이트 비밀번호가 12자 이상으로 바뀌어요.", "공공 사이트 비밀번호 12자 이상 의무화")).toEqual([]);
+  });
+
+  test("원문에 없으면 여전히 누출", () => {
+    expect(runs("금융위가 광고를 점검해요. 규칙 준수했습니다.", "금융위, 가상자산 광고 점검")).toEqual(["규칙 준수"]);
+  });
+
+  test("한국어에 쓰지 않는 중국어·일본어 문장부호는 단독으로도 오염 (운영 데이터 「좋겠어요。」)", () => {
+    expect(runs("좋겠어요。")).toEqual(["。"]);
+    expect(runs("늘었ー다")).toEqual(["ー"]);
+    expect(runs("금리、환율")).toEqual(["、"]);
+    expect(runs("확보하세요.\u3000다음")).toEqual(["\u3000"]);
+    expect(runs("수익률이 \uFFFD\uFFFD")).toEqual(["\uFFFD\uFFFD"]);
+  });
+
+  test("한국어에서도 쓰는 낫표와 가운뎃점은 정상", () => {
+    expect(findForeignScript("「이 인사이트는」 『경제』 금·은")).toEqual([]);
+  });
+});
