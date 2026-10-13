@@ -17,6 +17,7 @@ import { buildAnalysisPrompt } from "@/services/prompt-builder.ts";
 import { getExistingLinks } from "@/services/database.ts";
 import { createStructured } from "@/services/openai-client.ts";
 import { scoreHeadlines, scoreQuality } from "@/services/article-scoring.ts";
+import { describeScriptIssues, findForeignScriptDeep } from "@/utils/script-guard.ts";
 
 /** Stage 3 성공률이 이보다 낮으면 크론을 실패로 끝낸다 (0개 저장 + 성공 종료 방지) */
 export const MIN_STAGE3_SUCCESS_RATE = 0.5;
@@ -193,6 +194,7 @@ async function analyzeArticleWithAI(
 ): Promise<NewsAnalysisResult | null> {
   // 동적 프롬프트 생성 (Few-shot, Rubric, CoT 포함)
   const { system, user } = await buildAnalysisPrompt(article);
+  const source = `${article.title} ${article.description ?? ""}`;
 
   try {
     return await createStructured({
@@ -202,6 +204,7 @@ async function analyzeArticleWithAI(
       user,
       maxOutputTokens: 8000,
       timeoutMs: 170_000,
+      validate: (out) => describeScriptIssues(findForeignScriptDeep(out, source)),
     });
   } catch (error) {
     log(`상세 분석 오류 (${article.title.substring(0, 30)}...): ${getErrorMessage(error)}`, "error");
