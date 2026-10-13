@@ -11,7 +11,12 @@
   "confidence": "high",
   "reason": "괄호 안 한자 병기 '一带一路'의 음(일대일로)이 앞 한국어와 일치(간체지만 고유 정책명)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0011",
@@ -25,7 +30,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0012",
@@ -39,7 +49,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0013",
@@ -53,7 +68,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0014",
@@ -67,7 +87,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0015",
@@ -81,7 +106,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0016",
@@ -95,7 +125,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0017",
@@ -109,7 +144,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0018",
@@ -123,7 +163,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0019",
@@ -137,7 +182,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0020",
@@ -151,7 +201,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0021",
@@ -165,7 +220,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0022",
@@ -179,7 +239,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0023",
@@ -193,7 +258,12 @@
   "confidence": "high",
   "reason": "휘발유 리터 단위 기호 ℓ",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Other"
  },
  {
   "sid": "S0035",
@@ -210,7 +280,12 @@
    "old": "마감이迫迫하고",
    "new": "마감이 임박하고"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0037",
@@ -227,7 +302,12 @@
    "old": "개발에投入하게",
    "new": "개발에 투입하게"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0041",
@@ -244,7 +324,12 @@
    "old": "주의深이 체크",
    "new": "주의 깊게 체크"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0044",
@@ -261,7 +346,12 @@
    "old": "확인事项입니다",
    "new": "확인 사항입니다"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0045",
@@ -278,7 +368,12 @@
    "old": "次の 관심 시점은",
    "new": "다음 관심 시점은"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han+Kana"
  },
  {
   "sid": "S0046",
@@ -295,7 +390,12 @@
    "old": "발표日程은",
    "new": "발표 일정은"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0057",
@@ -309,7 +409,12 @@
   "confidence": "low",
   "reason": "괄호 병기 '對韓'(대한)의 음이 앞 '대'와 맞지 않음(한국 대상 관세라는 뜻이 한글에서 빠짐) / 오케스트레이터 결정: 의미 전달은 되므로 고치지 않는다. 괄호 병기는 검출기 범위 밖(음 일치 검사 없음)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0108",
@@ -323,7 +428,12 @@
   "confidence": "high",
   "reason": "리포트 제목의 신문식 약어 '株'(결제주)로 자연스러움",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0109",
@@ -337,7 +447,12 @@
   "confidence": "low",
   "reason": "금(gold)을 뜻하는 신문식 약어 '金'. 본문 문장이라 '금'이 더 자연스럽지만 의미 혼동 방지 용도로 허용",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0110",
@@ -351,7 +466,12 @@
   "confidence": "high",
   "reason": "관심 목록 항목의 신문식 약어 '株'(장비주)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0112",
@@ -368,7 +488,12 @@
    "old": "これは 투자 조언이",
    "new": "이는 투자 조언이"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0113",
@@ -385,7 +510,12 @@
    "old": "분석입니다. なお 라는 일본어 표현 사용 금지 규칙 준수했습니다.",
    "new": "분석입니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0133",
@@ -399,7 +529,12 @@
   "confidence": "high",
   "reason": "리포트 제목의 신문식 약어 '車'(자동차)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0134",
@@ -416,7 +551,12 @@
    "old": "주목하세요. これは 금지된 일본어 표현 아님.",
    "new": "주목하세요."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0138",
@@ -433,7 +573,12 @@
    "old": "있어요. なお(주의: 일본어 표현 금지)",
    "new": "있어요."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0141",
@@ -450,7 +595,12 @@
    "old": "있습니다. これは日本語使用 금지",
    "new": "있습니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana+Han"
  },
  {
   "sid": "S0142",
@@ -467,7 +617,12 @@
    "old": "주시하세요. 일본어 금지 표기 주의하세요. なお(금지).",
    "new": "주시하세요."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0143",
@@ -484,7 +639,12 @@
    "old": " これは使わないでください。",
    "new": ""
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana+Han"
  },
  {
   "sid": "S0144",
@@ -501,7 +661,12 @@
    "old": "권장합니다. なお(금지) 사용 금지.",
    "new": "권장합니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0146",
@@ -518,7 +683,12 @@
    "old": "관찰됩니다. 일본어 사용 금지 유의하세요. なお 같은 표현 금지.",
    "new": "관찰됩니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0147",
@@ -535,7 +705,12 @@
    "old": "있습니다. 금지어 주의하세요. なお 사용 금지.",
    "new": "있습니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0148",
@@ -552,7 +727,12 @@
    "old": "피하세요. 일본어 표현 사용하지 마세요. なお 등 금지어 금지합니다.",
    "new": "피하세요."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0149",
@@ -569,7 +749,12 @@
    "old": " ご了承不可.",
    "new": ""
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana+Han"
  },
  {
   "sid": "S0150",
@@ -586,7 +771,12 @@
    "old": "권장합니다. なお 등 사용 금지합니다.",
    "new": "권장합니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0151",
@@ -603,7 +793,12 @@
    "old": " ご了承使用不可.",
    "new": ""
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana+Han"
  },
  {
   "sid": "S0152",
@@ -620,7 +815,12 @@
    "old": "예상돼요. 일본어 금지 유의하세요. なお 사용 불가.",
    "new": "예상돼요."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0153",
@@ -637,7 +837,12 @@
    "old": "확인해야 합니다. 일본어 표현은 사용 금지입니다. 주의하세요. なお 등은 쓰지 마세요. (내부 규정 준수 문구 주의).",
    "new": "확인해야 합니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0154",
@@ -654,7 +859,12 @@
    "old": " なお 와 같은 어휘 사용 금지 표기 제거 필요.",
    "new": ""
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0155",
@@ -671,7 +881,12 @@
    "old": "추천합니다. 금지어 사용 주의하세요. なお 등 사용 금지.",
    "new": "추천합니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0156",
@@ -688,7 +903,12 @@
    "old": "제한적입니다. 금지 표현 사용 금지 유지하세요. なお 금지.",
    "new": "제한적입니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0180",
@@ -705,7 +925,12 @@
    "old": "권장합니다. 受(가계 재무 안정) 측면에서",
    "new": "권장합니다. 가계 재무 안정 측면에서"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0205",
@@ -719,7 +944,12 @@
   "confidence": "high",
   "reason": "'대(對)' 괄호 병기, 음 일치",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0222",
@@ -733,7 +963,12 @@
   "confidence": "high",
   "reason": "리포트 제목의 신문식 표현 '중동發'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0242",
@@ -747,7 +982,12 @@
   "confidence": "high",
   "reason": "수치 표기의 신문식 약어 '전월比/전년比'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0243",
@@ -761,7 +1001,12 @@
   "confidence": "high",
   "reason": "수치 표기의 신문식 약어 '전월比/전년比'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0244",
@@ -775,7 +1020,12 @@
   "confidence": "high",
   "reason": "수치 표기의 신문식 약어 '전월比/전년比'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0245",
@@ -792,7 +1042,12 @@
    "old": "企業 내부에서는",
    "new": "기업 내부에서는"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0246",
@@ -806,7 +1061,12 @@
   "confidence": "high",
   "reason": "'비(非)' 괄호 병기, 음 일치",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0296",
@@ -823,7 +1083,12 @@
    "old": "投資자들은",
    "new": "투자자들은"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0306",
@@ -840,7 +1105,12 @@
    "old": "重要: 이 분석은",
    "new": "중요: 이 분석은"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0309",
@@ -854,7 +1124,12 @@
   "confidence": "high",
   "reason": "괄호 안 수치 표기의 신문식 약어 '전년比'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0310",
@@ -871,7 +1146,12 @@
    "old": "企業 내부에서도",
    "new": "기업 내부에서도"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0311",
@@ -888,7 +1168,12 @@
    "old": "まず 비상금",
    "new": "먼저 비상금"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0312",
@@ -905,7 +1190,12 @@
    "old": "収入 변동 대비",
    "new": "수입 변동 대비"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0313",
@@ -922,7 +1212,12 @@
    "old": "客室·정비 등",
    "new": "객실·정비 등"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0314",
@@ -939,7 +1234,12 @@
    "old": "早割 예약 전략",
    "new": "조기 할인 예약 전략"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0315",
@@ -956,7 +1256,12 @@
    "old": "収益化 구조 변동",
    "new": "수익화 구조 변동"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0351",
@@ -970,7 +1275,12 @@
   "confidence": "high",
   "reason": "리포트 제목의 신문식 약어 '친환경車'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0400",
@@ -984,7 +1294,12 @@
   "confidence": "high",
   "reason": "'비(非)' 괄호 병기, 음 일치",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0438",
@@ -998,7 +1313,12 @@
   "confidence": "high",
   "reason": "하이라이트 제목의 신문식 약어 '메모리株'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0456",
@@ -1012,7 +1332,12 @@
   "confidence": "high",
   "reason": "'비(非)' 괄호 병기, 음 일치",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0466",
@@ -1026,7 +1351,12 @@
   "confidence": "low",
   "reason": "신문식 약어 '株'(상장주). 본문 요약 줄이라 '주'가 더 자연스럽지만 허용 범위",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0547",
@@ -1043,7 +1373,12 @@
    "old": "구글(大테크)",
    "new": "구글(빅테크)"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0571",
@@ -1057,7 +1392,12 @@
   "confidence": "high",
   "reason": "'주(州)' 괄호 병기, 음 일치(행정구역 주를 구별)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0573",
@@ -1071,7 +1411,12 @@
   "confidence": "high",
   "reason": "'주(州)' 괄호 병기, 음 일치(행정구역 주를 구별)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0579",
@@ -1085,7 +1430,12 @@
   "confidence": "high",
   "reason": "헤드라인의 신문식 약어 '에너지株'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0600",
@@ -1099,7 +1449,12 @@
   "confidence": "high",
   "reason": "'비(非)' 괄호 병기, 음 일치",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0613",
@@ -1116,7 +1471,12 @@
    "old": "これは 투자 조언이 아니라",
    "new": "이는 투자 조언이 아니라"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0614",
@@ -1133,7 +1493,12 @@
    "old": "これは 투자 조언이 아닙니다.",
    "new": "이는 투자 조언이 아닙니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0619",
@@ -1150,7 +1515,12 @@
    "old": "중요해집니다. нек(?) (끝 문장 수정 불필요).",
    "new": "중요해집니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Cyrillic"
  },
  {
   "sid": "S0621",
@@ -1164,7 +1534,12 @@
   "confidence": "high",
   "reason": "수치 표기의 신문식 약어 '전월比/전년比'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0685",
@@ -1181,7 +1556,12 @@
    "old": "企業별·업종별",
    "new": "기업별·업종별"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0689",
@@ -1198,7 +1578,12 @@
    "old": "살펴보겠습니다. なお(금지 표현 아님) — 일본어 사용 금지 규칙 준수: 본문은 전부 한국어",
    "new": "살펴보겠습니다."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Kana"
  },
  {
   "sid": "S0707",
@@ -1215,7 +1600,12 @@
    "old": "쌍위(二重)의 흐름",
    "new": "이중의 흐름"
   },
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": false,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0719",
@@ -1232,7 +1622,12 @@
    "old": "사이에서揺",
    "new": "사이에서 흔들려"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0744",
@@ -1249,7 +1644,12 @@
    "old": "具体 수치로는",
    "new": "구체적 수치로는"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0760",
@@ -1266,7 +1666,12 @@
    "old": "早め의 가계비 점검이",
    "new": "선제적인 가계비 점검이"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han+Kana"
  },
  {
   "sid": "S0789",
@@ -1283,7 +1688,12 @@
    "old": "수혜 기업을同",
    "new": "수혜 기업을"
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0845",
@@ -1300,7 +1710,12 @@
    "old": "중요해요.ليಗೆ",
    "new": "중요해요."
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Arabic+Kannada"
  },
  {
   "sid": "S0846",
@@ -1317,7 +1732,12 @@
    "old": "盈彩票?",
    "new": ""
   },
-  "detector_expected": true
+  "detector_expected": true,
+  "inSource": false,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0393",
@@ -1331,7 +1751,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0199",
@@ -1345,7 +1770,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '金'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0470",
@@ -1359,7 +1789,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '日'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0746",
@@ -1373,7 +1808,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '中'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0070",
@@ -1387,7 +1827,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0095",
@@ -1401,7 +1846,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": true,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0623",
@@ -1415,7 +1865,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0122",
@@ -1429,7 +1884,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '證'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0437",
@@ -1443,7 +1903,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '公'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0671",
@@ -1457,7 +1922,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '中'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0080",
@@ -1471,7 +1941,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0589",
@@ -1485,7 +1960,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '中'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0271",
@@ -1499,7 +1979,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0059",
@@ -1513,7 +1998,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '株'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0114",
@@ -1527,7 +2017,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0510",
@@ -1541,7 +2036,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '李'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": true,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0494",
@@ -1555,7 +2055,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '中'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0092",
@@ -1569,7 +2074,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '韓'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": true,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0299",
@@ -1583,7 +2093,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '日'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0118",
@@ -1597,7 +2112,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0639",
@@ -1611,7 +2131,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '比'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0500",
@@ -1625,7 +2150,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0081",
@@ -1639,7 +2169,12 @@
   "confidence": "high",
   "reason": "리포트 하이라이트 제목의 신문식 약어 '美'(입력 원문에도 있음)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0654",
@@ -1653,7 +2188,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0170",
@@ -1667,7 +2207,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0280",
@@ -1681,7 +2226,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0724",
@@ -1695,7 +2245,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0721",
@@ -1709,7 +2264,12 @@
   "confidence": "high",
   "reason": "리포트 하이라이트 제목의 신문식 약어 '美'(입력 원문에도 있음)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0084",
@@ -1723,7 +2283,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0665",
@@ -1737,7 +2302,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목. '조선(造船)' 괄호 병기, 음 일치",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0674",
@@ -1751,7 +2321,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0472",
@@ -1765,7 +2340,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '韓'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0071",
@@ -1779,7 +2359,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0278",
@@ -1793,7 +2378,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0068",
@@ -1807,7 +2397,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0645",
@@ -1821,7 +2416,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '美'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0181",
@@ -1835,7 +2435,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '株'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0358",
@@ -1849,7 +2454,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '株'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": true,
+  "abbrOnly": false,
+  "scripts": "Han"
  },
  {
   "sid": "S0495",
@@ -1863,7 +2473,12 @@
   "confidence": "high",
   "reason": "인용한 기사 원문 제목의 신문식 약어 '中'",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": false,
+  "inQuotes": false,
+  "abbrOnly": true,
+  "scripts": "Han"
  },
  {
   "sid": "S0192",
@@ -1877,6 +2492,11 @@
   "confidence": "high",
   "reason": "'중동발(發)' 괄호 병기, 음 일치(입력 원문에도 있음)",
   "fix": null,
-  "detector_expected": false
+  "detector_expected": false,
+  "inSource": true,
+  "inParens": true,
+  "inQuotes": false,
+  "abbrOnly": false,
+  "scripts": "Han"
  }
 ]
