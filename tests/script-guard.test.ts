@@ -314,3 +314,26 @@ describe("findForeignScript — 리뷰 반영 (V1 T1-T3)", () => {
     expect(findForeignScript("「이 인사이트는」 『경제』 금·은")).toEqual([]);
   });
 });
+
+describe("findForeignScript — 운영 복구 뒤 추가한 지시문·구조 누출", () => {
+  test("지시문 변형", () => {
+    expect(findForeignScript("소비 계획은 신중히 세우세요. 일본어 및 금지 문구 주의하세요.").map((i) => i.reason)).toContain("prompt-leak");
+    expect(findForeignScript("본 템플릿에 따라 정리했습니다.").map((i) => i.reason)).toContain("prompt-leak");
+  });
+
+  test("출력 구조(JSON 필드) 누출", () => {
+    for (const t of [
+      "아래 섹션별로 정리합니다.\n\nsections: [\n {\"title\": \"국내\"",
+      "점검해야 합니다.\n\nrelatedArticleIds: [19927,19930]",
+      "뒷받침합니다.\n\nevidence: [\n {\"text\":\"코스피\"",
+      "논의 가속화\n\nkey data: [\"기준금리 인상\"]",
+      "제안합니다.\n\n임팩트: high\n기간: short",
+      "섹션들: [ {",
+    ]) expect(findForeignScript(t).map((i) => i.reason)).toContain("prompt-leak");
+  });
+
+  test("필드 이름 뒤에 괄호가 없는 평범한 문장, 원문에 있는 문구는 통과", () => {
+    expect(findForeignScript("근거(evidence)는 기사 세 건입니다. 임팩트: 중간 정도예요.")).toEqual([]);
+    expect(findForeignScript("JSON schema 표준이 개정됐어요.", "W3C, JSON schema 표준 개정")).toEqual([]);
+  });
+});

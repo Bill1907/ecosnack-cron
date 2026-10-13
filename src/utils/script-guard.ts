@@ -51,6 +51,13 @@ const PROMPT_LEAK_PATTERNS = [
   /규칙 준수/g,
   /(?:전부|모두|반드시) 한국어/g,
   /\d+\s*자\s*(?:이상|이내|이하|내외|분량)/g,
+  // 운영 데이터 복구 뒤 재스캔에서 추가로 찾은 형태: 지시문 변형과 출력 구조(JSON 필드) 누출
+  /일본어.{0,10}(?:금지|주의)/g,
+  /금지 문구/g,
+  /\b(?:sections|implications|relatedArticleIds|key\s?data|actionItems|evidence)\\?"?\s*:\s*[[{]/gi,
+  /JSON schema|본 템플릿|내부 목차/gi,
+  /(?:임팩트|기간|타임호라이즌):\s*(?:high|medium|low|short|long)/gi,
+  /섹션들\s*:\s*\[/g,
 ];
 
 function isAllowedHan(chunk: string, index: number, text: string, source: string): boolean {
@@ -81,6 +88,9 @@ export function findForeignScript(text: string, source = ""): ScriptIssue[] {
     for (const m of text.matchAll(pattern)) {
       // 입력 원문에 같은 문구가 있으면 기사 내용이다 (예: "광고 규칙 준수 점검", "비밀번호 12자 이상")
       if (source.includes(m[0])) continue;
+      // 패턴끼리 겹치면 (예: "일본어 사용 금지") 먼저 잡은 것만 남긴다
+      const end = m.index + m[0].length;
+      if (issues.some((i) => i.reason === "prompt-leak" && i.index < end && m.index < i.index + i.run.length)) continue;
       issues.push({ run: m[0], index: m.index, reason: "prompt-leak" });
     }
   }
