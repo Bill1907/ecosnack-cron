@@ -329,6 +329,11 @@ describe("findForeignScript — 운영 복구 뒤 추가한 지시문·구조 �
       "논의 가속화\n\nkey data: [\"기준금리 인상\"]",
       "제안합니다.\n\n임팩트: high\n기간: short",
       "섹션들: [ {",
+      "모니터링을 권합니다. (relatedArticleIds 참조)",
+      "향후 주목할 이슈를 watchList로 제시합니다.",
+      "이 인사이트는 중기적(timeHorizon)이며",
+      "증거 및 출처: [{\"text\":\"보도\",\"articleId\":25614}]",
+      "sections을 통해 제공되는 수치는",
     ]) expect(findForeignScript(t).map((i) => i.reason)).toContain("prompt-leak");
   });
 
