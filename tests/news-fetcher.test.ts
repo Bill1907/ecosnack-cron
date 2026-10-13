@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach, beforeAll, afterAll, mock } from "bun:test";
-import { fetchAllNews, getNewsSources, FETCH_OPTIONS } from "@/services/news-fetcher.ts";
+import { fetchAllNews, getNewsSources, parseRssFeed, FETCH_OPTIONS } from "@/services/news-fetcher.ts";
 
 // 재시도 대기를 줄여 실패 경로 테스트가 기본 5초 제한 안에 끝나게 한다
 const savedDelay = FETCH_OPTIONS.retryDelayMs;
@@ -72,7 +72,7 @@ describe("news-fetcher", () => {
 
       expect(sourceNames).toContain("CNBC Business");
       expect(sourceNames).toContain("CNBC Economy");
-      expect(sourceNames).toContain("Yahoo Finance");
+      expect(sourceNames).toContain("CBS MoneyWatch");
       expect(sourceNames).toContain("매일경제 경제");
       expect(sourceNames).toContain("매일경제 증권");
       expect(sourceNames).toContain("한경 경제");
@@ -311,6 +311,39 @@ describe("news-fetcher", () => {
       if (article) {
         // 잘못된 날짜는 undefined여야 함
         expect(article.pubDate).toBeUndefined();
+      }
+    });
+  });
+
+  // 조사 근거: docs/text-quality-fix/recon/feeds.md
+  describe("피드 교체 (Yahoo Finance → CBS MoneyWatch)", () => {
+    test("소스 목록에 yahoo 피드 URL 이 없다", () => {
+      const urls = getNewsSources().map((s) => s.url);
+      expect(urls).not.toContain("https://finance.yahoo.com/news/rssindex");
+      expect(urls.filter((u) => u.includes("yahoo"))).toEqual([]);
+    });
+
+    test("CBS MoneyWatch 가 US 소스로 들어 있다", () => {
+      expect(getNewsSources()).toContainEqual({
+        url: "https://www.cbsnews.com/latest/rss/moneywatch",
+        source: "CBS MoneyWatch",
+        region: "US",
+      });
+    });
+
+    test("CBS MoneyWatch 피드 샘플을 파싱하면 8개 항목에 title·link·pubDate 가 있다", async () => {
+      const xml = await Bun.file(`${import.meta.dir}/fixtures/feeds/cbs-moneywatch.xml`).text();
+
+      const articles = parseRssFeed(xml, "CBS MoneyWatch", "US");
+
+      expect(articles).toHaveLength(8);
+      for (const a of articles) {
+        expect(a.title.length).toBeGreaterThan(0);
+        expect(a.link).toStartWith("https://www.cbsnews.com/");
+        expect(a.pubDate).toBeInstanceOf(Date);
+        expect(Number.isNaN(a.pubDate!.getTime())).toBe(false);
+        expect(a.source).toBe("CBS MoneyWatch");
+        expect(a.region).toBe("US");
       }
     });
   });
