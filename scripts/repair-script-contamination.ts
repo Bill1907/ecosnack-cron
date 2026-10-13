@@ -101,16 +101,28 @@ const STRUCTURE_LEAK =
   /\n\s*\n\s*(?:(?:sections|섹션들)\\?"?\s*:|implications\\?"?\s*:\s*(?:[[{(<]|$)|(?:relatedArticleIds|key\s?data|actionItems|evidence)\s*:\s*\[|evidence\s*:\s*\n\s*-\s*text\s*:|(?:임팩트|타임호라이즌|기간)\s*:\s*(?:high|medium|low|short|long))[\s\S]*$/iu;
 /** 본문 중간에 한 줄로 끼어든 필드 덤프(「- keyData: [ … ]」「- relatedArticleIds: [ … ]」)는 그 줄만 지운다 */
 const STRUCTURE_LINE = /\n[ \t]*-?[ \t]*(?:relatedArticleIds|key\s?data)\s*:\s*\[[^\n]*\][ \t]*,?[ \t]*(?=\n|$)/giu;
+/** 「증거 및 출처: [{"text":…,"articleId":…}]」처럼 문단 하나가 JSON 배열인 경우 그 문단을 지운다 (2026-09-30) */
+const JSON_DUMP_PARAGRAPH = /(?:^|\n)[^\n]{0,30}:\s*\[\{[^\n]*?"articleId"[^\n]*?\}\][ \t]*(?=\n|$)/gu;
+/** 본문 속 출력 필드 이름. 이 이름이 든 괄호 주석과 문장을 지운다 (「(relatedArticleIds 참조)」「keyData 항목들은 …」) */
+const FIELD = String.raw`(?:\b(?:relatedArticleIds|keyData|actionItems|timeHorizon|articleId|watchList)\b|\bsections(?=[을를은는이가에의]))`;
+const FIELD_PAREN = new RegExp(String.raw`(^|[.!?][ \t]*|\n[ \t]*|[ \t])\([^()\n]*${FIELD}[^()\n]*\)`, "gu");
+const FIELD_SENTENCE = new RegExp(String.raw`(^|[.!?](?=\s)|\n)[^.!?\n]*${FIELD}[^.!?\n]*[.!?]?`, "gu");
 function cutStructureLeak(text: string): string {
-  const cut = text.replace(STRUCTURE_LEAK, "").replace(STRUCTURE_LINE, "");
+  const cut = text
+    .replace(STRUCTURE_LEAK, "")
+    .replace(STRUCTURE_LINE, "")
+    .replace(JSON_DUMP_PARAGRAPH, "")
+    .replace(FIELD_PAREN, "$1")
+    .replace(FIELD_SENTENCE, "$1");
   // 지운 게 없으면 원문 그대로 (끝 공백·빈 줄 정리 같은 무관한 변경을 만들지 않는다)
-  return cut === text ? text : cut.replace(/\n{3,}/gu, "\n\n").replace(/\s+$/u, "");
+  return cut === text ? text : cut.replace(/(?:[ \t]*\n){3,}/gu, "\n\n").replace(/\s+$/u, "");
 }
 
 /** 표로 옮기기 어려운 한 건짜리 지시문 누출 (2026-02-18, R1b 후보 정규식 밖) */
 const MANUAL_FIXES: Fix[] = [
   { ref: "X0001", kind: "report", id: "2026-02-18", path: "key_insights[0].implications.consumers", old: " 일본어 및 금지 문구 주의하세요. 사용하지 마세요.", new: "" },
   { ref: "X0002", kind: "report", id: "2026-08-11", path: "market_overview.summary", old: "\n\n(참고: 마지막 관련ArticleIds에는 보조적 맥락 기사가 포함될 수 있습니다.)", new: "" },
+  { ref: "X0003", kind: "report", id: "2026-08-28", path: "key_insights[1].analysis", old: " \n\n아래는 관련 실행 아이템입니다.", new: "" },
 ];
 
 function walkStrings(v: unknown, fn: (s: string, path: string) => string, path = ""): unknown {
@@ -132,7 +144,9 @@ async function main() {
     union all
     select 'report:' || report_date::text from daily_reports where (title || array_to_string(top_keywords, ' ') || executive_summary::text || market_overview::text || key_insights::text || sentiment_analysis::text) ~ '${RULE_SQL}'
     union all
-    select 'report:' || report_date::text from daily_reports where (market_overview::text || key_insights::text) ~ '(sections|implications|섹션들|임팩트|타임호라이즌|relatedArticleIds|keyData|actionItems|evidence)\\\\?"?\\s*:'`);
+    select 'report:' || report_date::text from daily_reports where (market_overview::text || key_insights::text) ~ '(sections|implications|섹션들|임팩트|타임호라이즌|relatedArticleIds|keyData|actionItems|evidence)\\\\?"?\\s*:'
+    union all
+    select 'report:' || report_date::text from daily_reports where (executive_summary::text || market_overview::text || key_insights::text) ~ '(relatedArticleIds|keyData|actionItems|timeHorizon|articleId|watchList|sections[을를은는이가에의])'`);
   for (const { k } of ruleDocs) if (!byDoc.has(k)) byDoc.set(k, []);
 
   let changed = 0, skipped = 0, docs = 0, alreadyApplied = 0;
@@ -175,7 +189,7 @@ async function main() {
         const before = row[col];
         const after = walkStrings(before, (s, path) => {
           const next = kind === "report" ? cutStructureLeak(ruleFix(s)) : ruleFix(s);
-          if (next !== s) { console.log(`• 규칙 ${key} ${col}${path ? (path.startsWith("[") ? path : "." + path) : ""}\n    전: ${JSON.stringify(s.slice(-60))}\n    후: ${JSON.stringify(next.slice(-60))}`); changed++; }
+          if (next !== s) { console.log(`• 규칙 ${key} ${col}${path ? (path.startsWith("[") ? path : "." + path) : ""}\n    전: ${JSON.stringify(process.env.FULL ? s : s.slice(-60))}\n    후: ${JSON.stringify(process.env.FULL ? next : next.slice(-60))}`); changed++; }
           return next;
         });
         if (JSON.stringify(after) !== JSON.stringify(before)) { row[col] = after; touched.add(col); }

@@ -116,3 +116,4 @@
   - 2026-08-02 리포트는 `market_overview.sections[0].content` 전체가 템플릿 설명이라 잘라 낼 수 없어 **재생성**했다(§8의 예외 1건, gpt-6-luna 1회, 품질 92.8).
   - 최종 재스캔: foreign-script 0, prompt-leak 0 (기사 22,607 · 리포트 195). 남긴 것: 「implications: 투자자: …」「evidence: 참조 기사들은 …」처럼 영어 필드 이름 뒤에 읽을 수 있는 한국어 문장이 이어지는 경우(리포트 5개 안팎). 내용이 있어 지우지 않았다.
   - 백업: `~/development/ecosnack-backups/text-repair-2026-10-13{,-before-apply,-pass2-before-apply,-pass3-before-apply,-pass4-before-apply}.json`
+  - 5차(배포 뒤 페이지 확인에서 발견): 본문 속 출력 필드 이름 — 「(relatedArticleIds 참조)」「watchList로 제시합니다」「중기적(timeHorizon)」「증거 및 출처: [{"articleId":…}]」. 필드 이름이 든 괄호 주석·문장·JSON 문단을 지우는 규칙과 검출 패턴을 추가. 16건 / 문서 11개, 건너뜀 0. 재스캔 0.

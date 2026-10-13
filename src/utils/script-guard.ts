@@ -58,6 +58,9 @@ const PROMPT_LEAK_PATTERNS = [
   /JSON schema|본 템플릿|내부 목차/gi,
   /(?:임팩트|기간|타임호라이즌):\s*(?:high|medium|low|short|long)/gi,
   /섹션들\s*:\s*\[/g,
+  // 출력 스키마의 필드 이름은 한국어 본문에 나올 일이 없다 (「(relatedArticleIds 참조)」「watchList로 제시합니다」)
+  /\b(?:relatedArticleIds|keyData|actionItems|timeHorizon|articleId|watchList)\b/g,
+  /\bsections(?=[을를은는이가에의])/g,
 ];
 
 function isAllowedHan(chunk: string, index: number, text: string, source: string): boolean {
