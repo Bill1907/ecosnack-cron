@@ -1,4 +1,5 @@
-import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, spyOn, mock, beforeEach, afterEach } from "bun:test";
+import * as database from "@/services/database.ts";
 import type { AnalyzedNewsArticle } from "@/types/index.ts";
 
 // 샘플 데이터 (Zod 스키마에 맞는 구조)
@@ -118,6 +119,76 @@ describe("database", () => {
       const article2 = { ...sampleArticle, link: "https://example.com/unique2" };
 
       expect(article1.link).not.toBe(article2.link);
+    });
+  });
+
+  describe("saveNewsArticlesBatch", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type Any = any;
+    const articles = [
+      { ...sampleArticle, link: "https://example.com/b1" },
+      { ...sampleArticle, link: "https://example.com/b2" },
+      { ...sampleArticle, link: "https://example.com/b3" },
+    ];
+    let prismaSpy: { mockRestore: () => void };
+    let fake: {
+      article: Record<"createMany" | "findMany" | "findUnique" | "create", ReturnType<typeof mock>>;
+      $transaction: ReturnType<typeof mock>;
+    };
+
+    beforeEach(() => {
+      fake = {
+        article: {
+          createMany: mock(async () => ({ count: 3 })),
+          findMany: mock(async () => []),
+          findUnique: mock(async () => null),
+          create: mock(async (a: Any) => ({ id: 1, ...a.data, createdAt: new Date() })),
+        },
+        $transaction: mock(async () => []),
+      };
+      prismaSpy = spyOn(database, "getPrisma").mockImplementation(() => fake as never);
+    });
+    afterEach(() => {
+      prismaSpy.mockRestore();
+    });
+
+    test("createMany 를 skipDuplicates:true 로 한 번 부르고 $transaction 은 부르지 않는다", async () => {
+      const saved = await database.saveNewsArticlesBatch(articles);
+
+      expect(fake.article.createMany).toHaveBeenCalledTimes(1);
+      const args = fake.article.createMany.mock.calls[0]![0] as Any;
+      expect(args.skipDuplicates).toBe(true);
+      expect(args.data.map((d: Any) => d.link)).toEqual(articles.map((a) => a.link));
+      expect(args.data[0].title).toBe("Test Article");
+      expect(args.data[0].importanceScore).toBe(8);
+      expect(fake.$transaction).not.toHaveBeenCalled();
+      expect(fake.article.findMany).not.toHaveBeenCalled(); // 저장 전 getExistingLinks 조회는 없다
+      expect(saved).toBe(3);
+    });
+
+    test("신규로 저장된 수(count)를 돌려준다 — 중복은 세지 않는다", async () => {
+      fake.article.createMany.mockImplementation(async () => ({ count: 1 }));
+
+      expect(await database.saveNewsArticlesBatch(articles)).toBe(1);
+    });
+
+    test("빈 배열이면 DB 를 건드리지 않고 0", async () => {
+      expect(await database.saveNewsArticlesBatch([])).toBe(0);
+      expect(fake.article.createMany).not.toHaveBeenCalled();
+    });
+
+    test("createMany 가 throw 하면 개별 저장(saveNewsArticles)으로 폴백한다", async () => {
+      fake.article.createMany.mockImplementation(async () => {
+        throw new Error("boom");
+      });
+
+      const saved = await database.saveNewsArticlesBatch(articles);
+
+      expect(fake.article.createMany).toHaveBeenCalledTimes(1);
+      expect(fake.article.findUnique).toHaveBeenCalledTimes(3);
+      expect(fake.article.create).toHaveBeenCalledTimes(3);
+      expect(fake.$transaction).not.toHaveBeenCalled();
+      expect(saved).toBe(3);
     });
   });
 });
