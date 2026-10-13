@@ -43,6 +43,7 @@ function loadFixes(): Fix[] {
   for (const x of JSON.parse(readFileSync(LABELS, "utf8"))) {
     if (x.label === "contaminated" && x.fix) fixes.push({ ref: x.sid, kind: x.kind, id: String(x.id), path: x.path, old: x.fix.old, new: x.fix.new });
   }
+  fixes.push(...MANUAL_FIXES);
   return fixes;
 }
 
@@ -90,6 +91,28 @@ function ruleFix(text: string): string {
     .replace(/\u3000/gu, " ");
 }
 
+/**
+ * 구조 누출 잘라내기(리포트만): 본문 뒤 문단에 붙은 출력 JSON 구조(「sections: [ … ]」, 「implications: { … }」,
+ * 「임팩트: high / 기간: short」, 「relatedArticleIds: [ … ]」 등)는 그 문단부터 문자열 끝까지 지운다.
+ * 2026-02~09 리포트에서 확인한 형태만 다룬다. 「consumers: 가계 지출을…」처럼 영어 키 뒤에 읽을 수 있는 문장이 이어지는
+ * 경우는 내용이 있어 지우지 않는다.
+ */
+const STRUCTURE_LEAK =
+  /\n\s*\n\s*(?:(?:sections|섹션들)\\?"?\s*:|implications\\?"?\s*:\s*(?:[[{(<]|$)|(?:relatedArticleIds|key\s?data|actionItems|evidence)\s*:\s*\[|evidence\s*:\s*\n\s*-\s*text\s*:|(?:임팩트|타임호라이즌|기간)\s*:\s*(?:high|medium|low|short|long))[\s\S]*$/iu;
+/** 본문 중간에 한 줄로 끼어든 필드 덤프(「- keyData: [ … ]」「- relatedArticleIds: [ … ]」)는 그 줄만 지운다 */
+const STRUCTURE_LINE = /\n[ \t]*-?[ \t]*(?:relatedArticleIds|key\s?data)\s*:\s*\[[^\n]*\][ \t]*,?[ \t]*(?=\n|$)/giu;
+function cutStructureLeak(text: string): string {
+  const cut = text.replace(STRUCTURE_LEAK, "").replace(STRUCTURE_LINE, "");
+  // 지운 게 없으면 원문 그대로 (끝 공백·빈 줄 정리 같은 무관한 변경을 만들지 않는다)
+  return cut === text ? text : cut.replace(/\n{3,}/gu, "\n\n").replace(/\s+$/u, "");
+}
+
+/** 표로 옮기기 어려운 한 건짜리 지시문 누출 (2026-02-18, R1b 후보 정규식 밖) */
+const MANUAL_FIXES: Fix[] = [
+  { ref: "X0001", kind: "report", id: "2026-02-18", path: "key_insights[0].implications.consumers", old: " 일본어 및 금지 문구 주의하세요. 사용하지 마세요.", new: "" },
+  { ref: "X0002", kind: "report", id: "2026-08-11", path: "market_overview.summary", old: "\n\n(참고: 마지막 관련ArticleIds에는 보조적 맥락 기사가 포함될 수 있습니다.)", new: "" },
+];
+
 function walkStrings(v: unknown, fn: (s: string, path: string) => string, path = ""): unknown {
   if (typeof v === "string") return fn(v, path);
   if (Array.isArray(v)) return v.map((x, i) => walkStrings(x, fn, `${path}[${i}]`));
@@ -107,10 +130,12 @@ async function main() {
   const ruleDocs: { k: string }[] = await db.$queryRawUnsafe(`
     select 'article:' || id k from articles where (coalesce(headline_summary,'') || coalesce(so_what::text,'') || coalesce(impact_analysis::text,'') || coalesce(related_context::text,'') || array_to_string(keywords, ' ')) ~ '${RULE_SQL}'
     union all
-    select 'report:' || report_date::text from daily_reports where (title || array_to_string(top_keywords, ' ') || executive_summary::text || market_overview::text || key_insights::text || sentiment_analysis::text) ~ '${RULE_SQL}'`);
+    select 'report:' || report_date::text from daily_reports where (title || array_to_string(top_keywords, ' ') || executive_summary::text || market_overview::text || key_insights::text || sentiment_analysis::text) ~ '${RULE_SQL}'
+    union all
+    select 'report:' || report_date::text from daily_reports where (market_overview::text || key_insights::text) ~ '(sections|implications|섹션들|임팩트|타임호라이즌|relatedArticleIds|keyData|actionItems|evidence)\\\\?"?\\s*:'`);
   for (const { k } of ruleDocs) if (!byDoc.has(k)) byDoc.set(k, []);
 
-  let changed = 0, skipped = 0, docs = 0;
+  let changed = 0, skipped = 0, docs = 0, alreadyApplied = 0;
   try {
     for (const [key, list] of byDoc) {
       const [kind, id] = key.split(":") as [Kind, string];
@@ -135,6 +160,8 @@ async function main() {
         const at = locate(text, f.old);
         if (typeof at === "string") {
           if (covered.has(f.ref) && at === "못 찾음") { console.log(`= ${f.ref} ${key} ${f.path}: 앞선 meta 치환에 포함됨`); continue; }
+          // 다시 돌릴 때: 이미 고친 곳은 old 가 없다. 첫 적용(2026-10-13)은 건너뜀 0건으로 끝났다
+          if (at === "못 찾음") { alreadyApplied++; continue; }
           console.log(`✗ ${f.ref} ${key} ${f.path}: ${at} — ${JSON.stringify(f.old.slice(0, 60))}`); skipped++; continue;
         }
         const next = splice(text, at.start, at.end, f.new);
@@ -147,7 +174,7 @@ async function main() {
       for (const col of Object.keys(cols)) {
         const before = row[col];
         const after = walkStrings(before, (s, path) => {
-          const next = ruleFix(s);
+          const next = kind === "report" ? cutStructureLeak(ruleFix(s)) : ruleFix(s);
           if (next !== s) { console.log(`• 규칙 ${key} ${col}${path ? (path.startsWith("[") ? path : "." + path) : ""}\n    전: ${JSON.stringify(s.slice(-60))}\n    후: ${JSON.stringify(next.slice(-60))}`); changed++; }
           return next;
         });
@@ -166,7 +193,7 @@ async function main() {
   } finally {
     await closeDatabase();
   }
-  console.log(`\n${apply ? "적용" : "dry-run"}: 치환 ${changed}건 / 문서 ${docs}개, 건너뜀 ${skipped}건`);
+  console.log(`\n${apply ? "적용" : "dry-run"}: 치환 ${changed}건 / 문서 ${docs}개, 건너뜀 ${skipped}건, 이미 적용(old 없음) ${alreadyApplied}건`);
   if (apply && skipped > 0) process.exit(1);
 }
 
