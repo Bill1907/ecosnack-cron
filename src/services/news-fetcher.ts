@@ -21,8 +21,8 @@ const NEWS_SOURCES: RssSource[] = [
     region: "US",
   },
   {
-    url: "https://finance.yahoo.com/news/rssindex",
-    source: "Yahoo Finance",
+    url: "https://www.cbsnews.com/latest/rss/moneywatch",
+    source: "CBS MoneyWatch",
     region: "US",
   },
   {
@@ -87,7 +87,7 @@ function parseRssItem(item: Record<string, unknown>, source: string, region: str
 }
 
 // RSS 피드 파싱
-function parseRssFeed(xml: string, source: string, region: string): RawNewsArticle[] {
+export function parseRssFeed(xml: string, source: string, region: string): RawNewsArticle[] {
   try {
     const result = xmlParser.parse(xml);
     const articles: RawNewsArticle[] = [];

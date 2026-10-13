@@ -161,7 +161,7 @@ export async function saveNewsArticles(
   return savedCount;
 }
 
-// 여러 뉴스 기사 배치 저장 (트랜잭션 사용)
+// 여러 뉴스 기사 배치 저장 (INSERT 한 문장, 중복 링크는 건너뜀)
 export async function saveNewsArticlesBatch(
   articles: AnalyzedNewsArticle[]
 ): Promise<number> {
@@ -172,44 +172,34 @@ export async function saveNewsArticlesBatch(
   const db = getPrisma();
 
   try {
-    // 1. 먼저 이미 존재하는 링크 조회 (정확한 카운트를 위해)
-    const links = articles.map((a) => a.link);
-    const existingLinks = await getExistingLinks(links);
-    const newArticleCount = articles.length - existingLinks.size;
+    // $transaction([...upsert]) 는 Workers 에서 5초 한도를 넘겨 매번 실패했다.
+    // createMany 는 INSERT … ON CONFLICT DO NOTHING 한 문장이고, Prisma 가 감싸는 내부 트랜잭션에는 시간 한도가 없다
+    const { count } = await db.article.createMany({
+      data: articles.map((article) => ({
+        title: article.title,
+        link: article.link,
+        description: article.description ?? null,
+        pubDate: article.pubDate ?? null,
+        source: article.source ?? null,
+        region: article.region ?? null,
+        imageUrl: article.imageUrl ?? null,
+        headlineSummary: article.headlineSummary ?? null,
+        soWhat: toJsonValue(article.soWhat),
+        impactAnalysis: toJsonValue(article.impactAnalysis),
+        relatedContext: toJsonValue(article.relatedContext),
+        keywords: article.keywords ?? [],
+        category: article.category ?? null,
+        sentiment: toJsonValue(article.sentiment),
+        importanceScore: normalizeImportanceScore(article.importanceScore),
+      })),
+      skipDuplicates: true,
+    });
 
-    // 2. 트랜잭션으로 일괄 upsert 처리
-    await db.$transaction(
-      articles.map((article) =>
-        db.article.upsert({
-          where: { link: article.link },
-          create: {
-            title: article.title,
-            link: article.link,
-            description: article.description ?? null,
-            pubDate: article.pubDate ?? null,
-            source: article.source ?? null,
-            region: article.region ?? null,
-            imageUrl: article.imageUrl ?? null,
-            headlineSummary: article.headlineSummary ?? null,
-            soWhat: toJsonValue(article.soWhat),
-            impactAnalysis: toJsonValue(article.impactAnalysis),
-            relatedContext: toJsonValue(article.relatedContext),
-            keywords: article.keywords ?? [],
-            category: article.category ?? null,
-            sentiment: toJsonValue(article.sentiment),
-            importanceScore: normalizeImportanceScore(article.importanceScore),
-          },
-          update: {}, // 이미 존재하면 업데이트하지 않음
-        })
-      )
-    );
-
-    const duplicateCount = existingLinks.size;
     log(
-      `배치 저장 완료: ${newArticleCount}/${articles.length}개 저장 (${duplicateCount}개 중복 건너뜀)`
+      `배치 저장 완료: ${count}/${articles.length}개 저장 (${articles.length - count}개 중복 건너뜀)`
     );
 
-    return newArticleCount;
+    return count;
   } catch (error) {
     log(`배치 저장 실패: ${getErrorMessage(error)}`, "error");
     // 폴백: 개별 저장으로 시도

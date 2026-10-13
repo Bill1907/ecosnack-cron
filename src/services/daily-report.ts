@@ -26,6 +26,7 @@ import {
   calculateFinalQualityScore,
 } from "@/services/quality-evaluator.ts";
 import { createStructured } from "@/services/openai-client.ts";
+import { describeScriptIssues, findForeignScriptDeep } from "@/utils/script-guard.ts";
 
 // ============================================
 // 시스템 프롬프트
@@ -216,6 +217,9 @@ ${formattedArticles}
 4. 텍스트 필드에 "기사 N", "id=N", "#N" 같은 기사 참조를 절대 삽입하지 마세요. 기사 ID는 지정된 JSON 필드에만 기록하세요
 5. 모든 텍스트는 반드시 한국어만 사용하세요 (일본어, 중국어 등 혼용 금지)`;
 
+  // 모델에 준 입력 전체(제목·설명 + 기사 분석문). 입력에서 옮겨 온 한자는 오염으로 보지 않는다
+  const source = [formattedArticles, ...topArticles.map((a) => `${a.title} ${a.description ?? ""}`)].join(" ");
+
   const parsed = await createStructured({
     schema: DailyReportAIResponseSchema,
     name: "daily_report",
@@ -225,6 +229,8 @@ ${formattedArticles}
     reasoningEffort: "low",
     maxOutputTokens: 32000,
     timeoutMs: 420_000,
+    // sanitizeReportText 전의 원 응답을 검사한다
+    validate: (out) => describeScriptIssues(findForeignScriptDeep(out, source)),
   });
   return sanitizeReportText(parsed);
 }

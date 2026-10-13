@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { z } from "zod";
 import { config } from "@/config/index.ts";
-import { withRetry, withTimeout, isNonRetryableHttpError } from "@/utils/index.ts";
+import { log, withRetry, withTimeout, isNonRetryableHttpError } from "@/utils/index.ts";
 
 let client: OpenAI | null = null;
 
@@ -30,6 +30,8 @@ export interface StructuredRequest<S extends z.ZodType> {
   reasoningEffort?: ReasoningEffort;
   timeoutMs?: number;
   retries?: number;
+  /** 파싱 성공 후 호출. 위반 사유를 돌려주면 `언어 오염: <사유>` 로 throw 해 같은 요청을 재시도한다. */
+  validate?: (out: z.infer<S>) => string | null;
 }
 
 /**
@@ -69,7 +71,13 @@ export async function createStructured<S extends z.ZodType>(
             `${req.name}: ${content ? "응답 잘림" : "빈 응답"} (finish_reason=${choice?.finish_reason ?? "unknown"}, output_tokens=${response.usage?.completion_tokens ?? "?"})`
           );
         }
-        return req.schema.parse(JSON.parse(content));
+        const parsed: z.infer<S> = req.schema.parse(JSON.parse(content));
+        const violation = req.validate?.(parsed);
+        if (violation) {
+          log(`${req.name}: 언어 오염 감지 - ${violation}`, "warn");
+          throw new Error(`언어 오염: ${violation}`);
+        }
+        return parsed;
       },
       // 400/401/404 (잘못된 파라미터·모델명)는 다시 보내도 같다 — 바로 실패시켜 유료 호출 낭비를 막는다
       { retries: req.retries ?? 2, delay: 2000, shouldRetry: (e) => !isNonRetryableHttpError(e) }
