@@ -77,12 +77,38 @@ function splice(text: string, start: number, end: number, repl: string): string 
   return left + right;
 }
 
+/**
+ * 규칙 치환: 마침표 자리에 나온 중국어·일본어 문장부호. 「좋겠어요。」 }}}},」처럼 문자열 끝의 。 뒤에 붙은
+ * JSON 찌꺼기(」 ] } , 공백)도 함께 지운다. 운영 데이터 34곳(기사 22, 리포트 12)에서 확인한 형태만 다룬다.
+ */
+const RULE_SQL = "[。、\u3000]";
+function ruleFix(text: string): string {
+  return text
+    .replace(/。[」\]}\s,]*$/u, ".")
+    .replace(/。/gu, ".")
+    .replace(/、/gu, ", ")
+    .replace(/\u3000/gu, " ");
+}
+
+function walkStrings(v: unknown, fn: (s: string, path: string) => string, path = ""): unknown {
+  if (typeof v === "string") return fn(v, path);
+  if (Array.isArray(v)) return v.map((x, i) => walkStrings(x, fn, `${path}[${i}]`));
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walkStrings(x, fn, path ? `${path}.${k}` : k)]));
+  return v;
+}
+
 async function main() {
   initDatabase();
   const db = getPrisma();
   const fixes = loadFixes();
   const byDoc = new Map<string, Fix[]>();
   for (const f of fixes) byDoc.set(`${f.kind}:${f.id}`, [...(byDoc.get(`${f.kind}:${f.id}`) ?? []), f]);
+  // 규칙 치환 대상 문서도 함께 돈다
+  const ruleDocs: { k: string }[] = await db.$queryRawUnsafe(`
+    select 'article:' || id k from articles where (coalesce(headline_summary,'') || coalesce(so_what::text,'') || coalesce(impact_analysis::text,'') || coalesce(related_context::text,'') || array_to_string(keywords, ' ')) ~ '${RULE_SQL}'
+    union all
+    select 'report:' || report_date::text from daily_reports where (title || array_to_string(top_keywords, ' ') || executive_summary::text || market_overview::text || key_insights::text || sentiment_analysis::text) ~ '${RULE_SQL}'`);
+  for (const { k } of ruleDocs) if (!byDoc.has(k)) byDoc.set(k, []);
 
   let changed = 0, skipped = 0, docs = 0;
   try {
@@ -116,6 +142,16 @@ async function main() {
         parent[last] = next;
         touched.add(col);
         changed++;
+      }
+
+      for (const col of Object.keys(cols)) {
+        const before = row[col];
+        const after = walkStrings(before, (s, path) => {
+          const next = ruleFix(s);
+          if (next !== s) { console.log(`• 규칙 ${key} ${col}${path ? (path.startsWith("[") ? path : "." + path) : ""}\n    전: ${JSON.stringify(s.slice(-60))}\n    후: ${JSON.stringify(next.slice(-60))}`); changed++; }
+          return next;
+        });
+        if (JSON.stringify(after) !== JSON.stringify(before)) { row[col] = after; touched.add(col); }
       }
 
       if (touched.size === 0) continue;
